@@ -81,7 +81,10 @@ The probe needs three objects in the PingFederate the owner points `PF_BASE_URL`
 
 **Roll back** by deleting those three objects (the mapping first, then the access token manager, then the policy). Nothing else in PingFederate is changed by this lab, and the lab never writes to PingFederate.
 
-## State (step 3 of 3, integration)
+## State
 
-Done: validator, SSRF-guarded fetch, authorization server, tester, PingFederate client, API, web UI with three ReactFlow diagrams, presenter mode, Reset, doctor, talk track, hosted mode (Host, rate limit, `/client.json`, banner), Dockerfile and compose, k8s manifests and `scripts/deploy-se.sh`, `ci.yml`, Learning Hub pack, shelf entry.
-Not done: no GitHub repo, no image pushed, no SE deploy, no browser proof of the hosted build, and the pack's `catalog` is the placeholder `X0` (the validator requires one and no catalog row matches yet; the owner assigns it).
+Done (2026-10-29): validator, SSRF-guarded fetch, authorization server, tester, PingFederate client, API, web UI with three ReactFlow diagrams, presenter mode, Reset, doctor, talk track, hosted mode (Host, rate limits, `/client.json`, banner), Dockerfile and compose, k8s manifests and `scripts/deploy-se.sh`, `ci.yml`, Learning Hub pack, shelf entry. One independent review and one fix pass done.
+
+Hosted copy: https://cimd-lab.ai-demo.ping-devops.com (SE cluster, image `ghcr.io/cmuir_pingcorp/cimd-lab:f340b23a8c6a`, linux/arm64, digest `sha256:2340f744b7fccfebdbbbdaf73581e3ad621f695db51bed03b54099d1fbd8a9e9`). Verified by content: `/api/health` is `demo-health/1`, the served bundle carries the hosted banner, `/client.json` is the lab's own document, the Let's Encrypt certificate verifies, the tester shows 15 of 15 in a real browser, and the pod's imageID equals the registry digest. Against the SE PingFederate, the hosted lab's own document and client.dev both reach PingFederate's sign-in page (verdict `accepted`); no code has been captured, because sign-in needs a demo user's password.
+
+Not done: no self-hosted runner is registered for this repo, so CI runs stay queued until the owner adds one; the tier (Demo or Tester) is undecided, so conformance reports rules 10, 12 and 13 as FAIL for Demo; the pack's `catalog` is the placeholder `X0` (the owner assigns a real one); a browser pass over the hosted build was done once, by hand, not in CI.
