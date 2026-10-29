@@ -172,6 +172,11 @@ test('probe presets: an attacker-supplied client_id or redirect_uri in the body 
     for (const bad of ['http://x.example', '__proto__', 'constructor', '', null, 5]) {
       assert.equal((await postJson(lab, '/api/pf/probe', { preset: bad, confirm: true })).status, 400, String(bad));
     }
+    for (const preset of ['custom', 'free-form', 'https://attacker.example/x']) {
+      const r = await postJson(lab, '/api/pf/probe', { preset, confirm: true, clientId: 'https://attacker.example/x', client_id: 'https://attacker.example/x', redirectUri: 'https://attacker.example/cb' });
+      assert.equal(r.status, 400, preset);
+      assert.equal((await r.json()).error, 'unknown_preset');
+    }
     assert.equal(lab.requests.length, 2, 'unknown presets made no request');
   } finally { await lab.close(); }
 });
