@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { createAuthServer } from './authserver.js';
 import { FIXTURES, FIXTURE_PATH } from './fixtures.js';
@@ -7,8 +10,9 @@ import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js'
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
 const MAX_PASTED_BYTES = 16 * 1024;
+const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
-export function createApp({ port, env = process.env, fetchImpl = fetch } = {}) {
+export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST } = {}) {
   const app = express();
   app.disable('x-powered-by');
   const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
@@ -117,6 +121,12 @@ export function createApp({ port, env = process.env, fetchImpl = fetch } = {}) {
     auth.reset();
     res.json({ ok: true });
   });
+
+  // The built web UI, when it exists. Registered last so it never shadows an API route.
+  if (fs.existsSync(path.join(webDist, 'index.html'))) {
+    app.use(express.static(webDist));
+    app.get(/^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)).*/, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
+  }
 
   return app;
 }

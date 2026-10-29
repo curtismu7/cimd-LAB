@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "server"
+    "server",
+    "web"
   ],
   "scripts": {
-    "test": "npm test -w server",
-    "start": "node --env-file=.env server/src/index.js"
+    "test": "npm test -w server && npm test -w web",
+    "start": "node --env-file=.env server/src/index.js",
+    "build": "npm run build -w web",
+    "dev:web": "npm run dev -w web",
+    "doctor": "node scripts/doctor.mjs"
   }
 }

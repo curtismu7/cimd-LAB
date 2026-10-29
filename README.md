@@ -41,7 +41,11 @@ Direction 1 settings (environment):
 
 The document rules are ported from client.dev (MIT, Copyright (c) Stytch). See `NOTICE`.
 
-## State (step 1 of 3, core)
+## Web UI
 
-Done: validator, SSRF-guarded fetch, authorization server, tester, PingFederate client, API, 22 tests.
-Not yet: web UI with ReactFlow diagrams, doctor, Reset script, presenter mode, talk track, Learning Hub pack, shelf entry, CI, SE build.
+`npm run build` builds `web/dist`, and `npm start` serves it with the API on http://127.0.0.1:5250. For UI work run `npm start` and `npm run dev:web` (Vite on http://127.0.0.1:5251, proxying `/api`). Four tabs: Learn, PingFederate as server, Lab as server, Talk track (`docs/talk-track.md`). Diagrams are `diagram-studio/1` JSON in `web/src/diagrams`. `npm run doctor` checks Node, port 5250 and the configured PingFederate (the only host it contacts).
+
+## State (step 2 of 3, web)
+
+Done: validator, SSRF-guarded fetch, authorization server, tester, PingFederate client, API, web UI with three ReactFlow diagrams, presenter mode, Reset, doctor, talk track, 25 server tests and 22 web tests.
+Not yet: Learning Hub pack, shelf entry, CI, SE build, health/Docker packaging, conformance run. Not verified in a browser yet.
