@@ -54,6 +54,8 @@ export default function PfView({ resetKey }) {
   const checkStatus = async () => { setBusy(true); setStatus(await api.pfStatus()); setBusy(false); };
   const runProbe = async () => { setBusy(true); setProbe(await api.pfProbe(preset)); setBusy(false); };
   const s = status?.data;
+  // Once the config has loaded, no PF_BASE_URL means nothing may be sent.
+  const notConfigured = Boolean(config?.data) && !config.data.pfBase;
 
   return (
     <div className="view" key={resetKey}>
@@ -64,15 +66,16 @@ export default function PfView({ resetKey }) {
       <section className="card">
         <h3>Configuration</h3>
         {!config && <p>Loading configuration.</p>}
+        {notConfigured && <p className="tone-bad" role="alert" data-testid="pf-not-configured">PingFederate is not configured: set PF_BASE_URL</p>}
         {config?.data && (
           <dl data-testid="config">
-            <dt>PingFederate base</dt><dd><code>{String(config.data.pfBase)}</code></dd>
+            <dt>PingFederate base</dt><dd>{config.data.pfBase ? <code>{String(config.data.pfBase)}</code> : 'not set'}</dd>
             <dt>Own document configured</dt><dd>{config.data.ownClientIdConfigured ? 'yes' : 'no (set CIMD_CLIENT_ID_URL and CIMD_REDIRECT_URI)'}</dd>
             <dt>client.dev example</dt><dd><code>{String(config.data.clientDev?.clientId)}</code></dd>
           </dl>
         )}
         {config && !config.ok && <p className="tone-bad">Could not read /api/config.</p>}
-        <button type="button" onClick={checkStatus} disabled={busy}>Check PingFederate discovery</button>
+        <button type="button" onClick={checkStatus} disabled={busy || notConfigured}>Check PingFederate discovery</button>
         <p className="hint">This contacts only the configured PingFederate base, and only when you press the button.</p>
         {status && (
           <div data-testid="pf-status" aria-live="polite">
@@ -99,7 +102,7 @@ export default function PfView({ resetKey }) {
           <label className="inline"><input type="radio" name="preset" checked={preset === 'own'} onChange={() => setPreset('own')} /> This lab's own document</label>
         </fieldset>
         <label className="inline"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I confirm this sends a request to the PingFederate shown above</label>
-        <button type="button" className="primary" onClick={runProbe} disabled={!confirm || busy}>Run probe</button>
+        <button type="button" className="primary" onClick={runProbe} disabled={!confirm || busy || notConfigured}>Run probe</button>
         {probe && !probe.ok && !probe.data?.verdict && (
           <p className="tone-bad" data-testid="probe-error">Probe refused: <code>{String(probe.data?.error ?? probe.status)}</code> {probe.data?.detail ? String(probe.data.detail) : ''}</p>
         )}

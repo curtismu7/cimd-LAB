@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import Learn from './views/Learn.jsx';
 import PfView from './views/PfView.jsx';
@@ -26,6 +26,7 @@ export default function App() {
   const [resetKey, setResetKey] = useState(0);
   const [resetNote, setResetNote] = useState('');
   const [hosted, setHosted] = useState(false);
+  const tabRefs = useRef({});
 
   useEffect(() => {
     let live = true;
@@ -45,6 +46,15 @@ export default function App() {
     setResetNote(r.ok ? 'Reset: server state cleared and diagram positions restored.' : 'Diagram positions restored; the server reset call failed.');
   };
   const nextTheme = { auto: 'light', light: 'dark', dark: 'auto' }[theme] ?? 'auto';
+  // ARIA tab pattern: one tab in the tab order, arrows/Home/End move focus and select.
+  const onTabKeyDown = (event) => {
+    const here = TABS.findIndex((t) => t.id === tab);
+    const target = { ArrowRight: (here + 1) % TABS.length, ArrowLeft: (here - 1 + TABS.length) % TABS.length, Home: 0, End: TABS.length - 1 }[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    setTab(TABS[target].id);
+    tabRefs.current[TABS[target].id]?.focus();
+  };
   const Active = TABS.find((t) => t.id === tab).View;
 
   return (
@@ -62,9 +72,20 @@ export default function App() {
         <button type="button" aria-pressed={presenter} className={presenter ? 'on' : ''} onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
       </header>
       {!presenter && (
-        <nav className="tabs" role="tablist" aria-label="Views">
+        <nav className="tabs" role="tablist" aria-label="Views" onKeyDown={onTabKeyDown}>
           {TABS.map((t) => (
-            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+            <button
+              key={t.id}
+              ref={(node) => { tabRefs.current[t.id] = node; }}
+              id={`tab-${t.id}`}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              aria-controls="tabpanel"
+              tabIndex={tab === t.id ? 0 : -1}
+              className={tab === t.id ? 'on' : ''}
+              onClick={() => setTab(t.id)}
+            >{t.label}</button>
           ))}
         </nav>
       )}
@@ -76,7 +97,7 @@ export default function App() {
         </nav>
       )}
       <p className="sr-only" role="status">{resetNote}</p>
-      <main>
+      <main id="tabpanel" {...(presenter ? {} : { role: 'tabpanel', 'aria-labelledby': `tab-${tab}` })}>
         <Active resetKey={resetKey} presenter={presenter} />
       </main>
     </div>

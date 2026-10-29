@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, act } from '@testing-library/react';
+import { render, screen, within, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { BANNER, HOSTED_BANNER } from './App.jsx';
 import Verdict, { VERDICTS } from './Verdict.jsx';
@@ -24,14 +24,14 @@ describe('tabs and cross-cutting chrome', () => {
   it('shows the banner and switches tabs, also in presenter mode', async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
-    expect(screen.getByRole('heading', { name: 'What CIMD is' })).toBeInTheDocument();
+    expect(await screen.findByRole('note')).toHaveTextContent(BANNER);
+    expect(await screen.findByRole('heading', { name: 'What CIMD is' })).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'PingFederate as server' }));
-    expect(screen.getByRole('heading', { name: /PingFederate as the authorization server/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /PingFederate as the authorization server/ })).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Lab as server' }));
-    expect(screen.getByRole('heading', { name: /The lab as the authorization server/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /The lab as the authorization server/ })).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Talk track' }));
-    expect(screen.getByRole('heading', { name: /talk track/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /talk track/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Presenter mode' }));
     expect(screen.getByRole('note')).toHaveTextContent(BANNER);
     expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull();
@@ -43,6 +43,63 @@ describe('tabs and cross-cutting chrome', () => {
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     expect(fetch).toHaveBeenCalledWith('/api/reset', expect.objectContaining({ method: 'POST' }));
+  });
+});
+
+describe('tablist follows the ARIA tab pattern', () => {
+  const names = ['Learn', 'PingFederate as server', 'Lab as server', 'Talk track'];
+  const tab = (name) => screen.getByRole('tab', { name });
+
+  it('only the selected tab is in the tab order, and the panel is labelled by it', async () => {
+    render(<App />);
+    expect(await screen.findByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'tab-learn');
+    for (const name of names) expect(tab(name)).toHaveAttribute('tabindex', name === 'Learn' ? '0' : '-1');
+    expect(tab('Learn')).toHaveAttribute('aria-selected', 'true');
+    expect(tab('Talk track')).toHaveAttribute('aria-selected', 'false');
+    expect(tab('Learn')).toHaveAttribute('aria-controls', 'tabpanel');
+  });
+
+  it('ArrowRight and ArrowLeft move focus and select, wrapping at the ends', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    tab('Learn').focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tab('PingFederate as server')).toHaveFocus();
+    expect(tab('PingFederate as server')).toHaveAttribute('aria-selected', 'true');
+    expect(tab('PingFederate as server')).toHaveAttribute('tabindex', '0');
+    expect(tab('Learn')).toHaveAttribute('tabindex', '-1');
+    expect(await screen.findByRole('heading', { name: /PingFederate as the authorization server/ })).toBeInTheDocument();
+    await user.keyboard('{ArrowLeft}{ArrowLeft}');
+    expect(tab('Talk track')).toHaveFocus();
+    expect(tab('Talk track')).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{ArrowRight}');
+    expect(tab('Learn')).toHaveFocus();
+    expect(tab('Learn')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('Home and End jump to the first and last tab', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    tab('Learn').focus();
+    await user.keyboard('{End}');
+    expect(tab('Talk track')).toHaveFocus();
+    expect(tab('Talk track')).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('heading', { name: /talk track/i })).toBeInTheDocument();
+    await user.keyboard('{Home}');
+    expect(tab('Learn')).toHaveFocus();
+    expect(tab('Learn')).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('heading', { name: 'What CIMD is' })).toBeInTheDocument();
+  });
+
+  it('other keys do nothing, and a click still selects and takes the tab stop', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    tab('Learn').focus();
+    await user.keyboard('a');
+    expect(tab('Learn')).toHaveAttribute('aria-selected', 'true');
+    await user.click(tab('Lab as server'));
+    expect(tab('Lab as server')).toHaveAttribute('tabindex', '0');
+    expect(tab('Learn')).toHaveAttribute('tabindex', '-1');
   });
 });
 
@@ -64,6 +121,7 @@ describe('hosted banner variant', () => {
     configAs('local');
     render(<App />);
     await screen.findByRole('note');
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/config', expect.anything()));
     await act(async () => {});
     expect(screen.getByRole('note')).not.toHaveTextContent('Hosted copy');
     expect(screen.getByRole('note')).toHaveTextContent(BANNER);
@@ -130,8 +188,12 @@ describe('PingFederate view', () => {
 
   it('shows a refusal such as own_client_not_configured', async () => {
     const user = userEvent.setup();
-    fetch.mockImplementation(async (url) => (url === '/api/pf/probe' ? json({ error: 'own_client_not_configured', detail: 'Set CIMD_CLIENT_ID_URL' }, 409) : json({})));
+    fetch.mockImplementation(async (url) => {
+      if (url === '/api/config') return json({ pfBase: 'https://pf.example:9031' });
+      return url === '/api/pf/probe' ? json({ error: 'own_client_not_configured', detail: 'Set CIMD_CLIENT_ID_URL' }, 409) : json({});
+    });
     render(<PfView resetKey={0} />);
+    await screen.findByText('https://pf.example:9031');
     await user.click(screen.getByLabelText(/own document/));
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Run probe' }));
@@ -145,6 +207,27 @@ describe('PingFederate view', () => {
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     expect(await screen.findByTestId('validate-result')).toHaveTextContent('Not valid');
     expect(container.querySelector('img')).toBeNull();
+  });
+});
+
+describe('PingFederate view without PF_BASE_URL', () => {
+  it('says it is not configured and disables both buttons, so nothing can be sent', async () => {
+    const user = userEvent.setup();
+    fetch.mockImplementation(async (url) => (url === '/api/config' ? json({ pfBase: '', ownClientIdConfigured: false, clientDev: { clientId: 'https://client.dev/oauth/metadata.json' } }) : json({})));
+    render(<PfView resetKey={0} />);
+    expect(await screen.findByTestId('pf-not-configured')).toHaveTextContent('PingFederate is not configured: set PF_BASE_URL');
+    expect(screen.getByRole('button', { name: 'Check PingFederate discovery' })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('button', { name: 'Run probe' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Run probe' }));
+    expect(fetch.mock.calls.some(([u]) => u === '/api/pf/probe' || u === '/api/pf/status')).toBe(false);
+  });
+
+  it('shows no warning when PF_BASE_URL is set', async () => {
+    render(<PfView resetKey={0} />);
+    expect(await screen.findByText('https://pf.example:9031')).toBeInTheDocument();
+    expect(screen.queryByTestId('pf-not-configured')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Check PingFederate discovery' })).toBeEnabled();
   });
 });
 
