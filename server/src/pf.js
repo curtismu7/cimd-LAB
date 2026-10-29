@@ -81,7 +81,18 @@ export async function probePf({ base, clientId, redirectUri, fetchImpl = fetch }
   const text = await response.text().catch(() => '');
   const location = response.headers.get('location');
   let verdict;
+  let authError = null;
+  if (location) {
+    try {
+      const next = new URL(location, built.url);
+      // PingFederate sends an error to the client's own redirect_uri once it has accepted the client but cannot go on.
+      if (next.searchParams.get('error') && next.origin + next.pathname === new URL(redirectUri).origin + new URL(redirectUri).pathname) {
+        authError = { error: next.searchParams.get('error'), description: next.searchParams.get('error_description') };
+      }
+    } catch { /* an unparsable Location is reported as unclear below */ }
+  }
   if (response.status === 400) verdict = 'rejected';
+  else if (authError) verdict = 'client-accepted-sign-in-failed';
   else if (response.status >= 300 && response.status < 400 && location) verdict = 'accepted';
   else if (response.status === 200 && /<form|password|username/i.test(text)) verdict = 'accepted';
   else verdict = 'unclear';
@@ -90,6 +101,7 @@ export async function probePf({ base, clientId, redirectUri, fetchImpl = fetch }
     request: built.url,
     status: response.status,
     verdict,
+    authError,
     location: location ? (() => { try { const next = new URL(location, built.url); return `${next.origin}${next.pathname}`; } catch { return null; } })() : null,
     excerpt: excerpt(text),
   };

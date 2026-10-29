@@ -178,3 +178,12 @@ test('own-client probe needs configuration; PF_BASE_URL must be https', async ()
     assert.deepEqual(insecure.attempts, []);
   } finally { await insecure.close(); }
 });
+
+test('a redirect to the client with an error is not reported as accepted', async () => {
+  const lab = await start({}, (url) => new Response('', { status: 302, headers: { location: `https://client.dev/oauth/callback?error=server_error&error_description=${encodeURIComponent('no authentication methods')}&state=x` } }));
+  try {
+    const body = await (await fetch(`${lab.base}/api/pf/probe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset: 'client.dev', confirm: true }) })).json();
+    assert.equal(body.verdict, 'client-accepted-sign-in-failed');
+    assert.deepEqual(body.authError, { error: 'server_error', description: 'no authentication methods' });
+  } finally { await lab.close(); }
+});
