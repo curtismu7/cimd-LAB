@@ -1,0 +1,12 @@
+# cert-manager certificate for the hosted copy. The issuer is the SE cluster's public ClusterIssuer, the same one the other
+# standalone apps use (read-only check of a sibling Certificate, 2026-10-29).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cimd-lab
+spec:
+  secretName: cimd-lab-tls
+  dnsNames: [__SE_HOST__]
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-pdo

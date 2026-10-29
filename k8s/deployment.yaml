@@ -17,6 +17,8 @@ spec:
       labels: { app: cimd-lab }
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

@@ -7,7 +7,7 @@
 # NAMESPACE, IMAGE, SE_HOST and PF_BASE_URL have no defaults. DRY_RUN=1 prints every rendered manifest, applies nothing, needs no cluster.
 # Renders everything to a temp dir first and fails (before any apply) if any __TOKEN__ is left in any file. After a real deploy (not done here): verify by CONTENT (/api/health is demo-health/1 and the
 # page carries the hosted banner), check the registry manifest and the pod imageID, then hand over the https:// URL.
-# Roll back: kubectl -n "$NAMESPACE" delete -f <rendered files> (or delete deployment, service, ingress and configmap named cimd-lab).
+# Roll back: kubectl -n "$NAMESPACE" delete -f <rendered files> (or delete the deployment, service, ingress, certificate and configmap named cimd-lab).
 set -euo pipefail
 cd "$(dirname "$0")/../k8s"
 
@@ -32,7 +32,7 @@ case "$PF_BASE_URL" in *[!A-Za-z0-9._:/-]*|*@*) echo "refusing: PF_BASE_URL must
 # Render every file into a temp dir and check ALL of them for a leftover __TOKEN__ before anything is printed or applied.
 RENDERED="$(mktemp -d)"
 trap 'rm -rf "$RENDERED"' EXIT
-FILES="configmap.yaml deployment.yaml service.yaml ingress.yaml"
+FILES="configmap.yaml deployment.yaml service.yaml certificate.yaml ingress.yaml"
 for f in $FILES; do
   sed -e "s|__IMAGE__|$IMAGE|g" -e "s|__SE_HOST__|$SE_HOST|g" -e "s|__PF_BASE_URL__|$PF_BASE_URL|g" "$f" > "$RENDERED/$f"
 done

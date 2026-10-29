@@ -62,7 +62,11 @@ test('manifests: non-root, read-only root filesystem, probes, limits, no namespa
   assert.match(out, /limits: \{ cpu: 500m, memory: 256Mi \}/);
   assert.match(out, /emptyDir/);
   assert.doesNotMatch(out, /^\s*namespace:/m);
-  assert.doesNotMatch(out, /kind: Secret|secretKeyRef|secretName/);
+  assert.doesNotMatch(out, /kind: Secret|secretKeyRef/);
+  // The only secret names are references: the TLS secret cert-manager creates and the existing registry pull secret.
+  const refs = [...out.matchAll(/secretName: (\S+)/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(refs)], ['cimd-lab-tls']);
+  assert.match(out, /imagePullSecrets:\n\s+- name: ghcr-pull-secret/);
   assert.match(out, /name: PORT, value: "5250"/);
 });
 
@@ -98,7 +102,7 @@ function copyRepoParts() {
 }
 
 test('deploy dry run: a leftover token in ANY file, even the last, fails before a single manifest is printed', () => {
-  for (const file of ['configmap.yaml', 'deployment.yaml', 'service.yaml', 'ingress.yaml']) {
+  for (const file of ['configmap.yaml', 'deployment.yaml', 'service.yaml', 'certificate.yaml', 'ingress.yaml']) {
     const tmp = copyRepoParts();
     fs.appendFileSync(path.join(tmp, 'k8s', file), '# stray __LEFT_OVER__\n');
     const r = deploy(VALUES, tmp);
@@ -126,7 +130,7 @@ test('deploy with approval applies nothing when a later file has a leftover toke
   const ok = run(clean);
   assert.equal(ok.status, 0, ok.stderr);
   const calls = fs.readFileSync(log, 'utf8').trim().split('\n');
-  assert.equal(calls.filter((c) => /apply -f/.test(c)).length, 4);
+  assert.equal(calls.filter((c) => /apply -f/.test(c)).length, 5);
   assert.match(calls.at(-1), /rollout status deployment\/cimd-lab/);
 });
 
