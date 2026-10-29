@@ -14,6 +14,8 @@ export const TABS = [
 
 export const BANNER = 'PingFederate parts use real PingFederate. The lab\'s own server is a teaching server, not a product. Tests with canned PingFederate replies prove nothing about PingFederate.';
 
+export const HOSTED_BANNER = 'Hosted copy: direction 2 is simulated by the lab\'s teaching server; direction 1 uses real PingFederate. State here is ephemeral and shared by every visitor.';
+
 function readStored(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStored(key, value) { try { localStorage.setItem(key, value); } catch { /* storage may be blocked */ } }
 
@@ -23,6 +25,13 @@ export default function App() {
   const [theme, setTheme] = useState(() => readStored('cimd-theme') ?? 'auto');
   const [resetKey, setResetKey] = useState(0);
   const [resetNote, setResetNote] = useState('');
+  const [hosted, setHosted] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    api.config().then((r) => { if (live && r.ok && r.data?.mode === 'hosted') setHosted(true); });
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -40,7 +49,7 @@ export default function App() {
 
   return (
     <div className={`app${presenter ? ' presenter' : ''}`}>
-      <div className="banner" role="note">{BANNER}</div>
+      <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER}</div>
       <header className="bar">
         <h1>CIMD Lab</h1>
         <span className="mode" data-testid="mode">Mode: real PingFederate (direction 1) and the lab's teaching server (direction 2)</span>

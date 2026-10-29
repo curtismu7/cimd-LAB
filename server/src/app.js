@@ -12,11 +12,44 @@ const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
 const MAX_PASTED_BYTES = 16 * 1024;
 const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
-export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST } = {}) {
+const RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60_000;
+const MAX_RATE_KEYS = 2000;
+
+// Hosted mode only: a small in-memory per-client limiter. Behind the ingress the rightmost X-Forwarded-For
+// entry is the address the ingress itself saw, so it is the one a visitor cannot forge.
+function createRateLimiter({ now, hosted }) {
+  const hits = new Map();
+  return (name) => (req, res, next) => {
+    if (!hosted) return next();
+    const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',').map((part) => part.trim()).filter(Boolean);
+    const ip = forwarded.at(-1) ?? req.socket.remoteAddress ?? 'unknown';
+    const key = `${name}|${ip}`;
+    const t = now();
+    const recent = (hits.get(key) ?? []).filter((at) => at > t - RATE_WINDOW_MS);
+    if (recent.length >= RATE_LIMIT) {
+      res.set('Retry-After', String(Math.ceil((recent[0] + RATE_WINDOW_MS - t) / 1000)));
+      return res.status(429).json({ error: 'rate_limited' });
+    }
+    recent.push(t);
+    hits.delete(key);
+    hits.set(key, recent);
+    while (hits.size > MAX_RATE_KEYS) hits.delete(hits.keys().next().value);
+    return next();
+  };
+}
+
+export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  const hosted = env.MODE === 'hosted';
+  const publicHost = hosted ? (env.PUBLIC_HOST || '') : '';
   const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+  if (publicHost) allowedHosts.add(publicHost);
+  // The lab calls itself (tester, fixtures) over loopback; the public origin is only an extra same-origin for browser writes.
   const origin = `http://127.0.0.1:${port}`;
+  const publicOrigin = publicHost ? `https://${publicHost}` : null;
+  const limit = createRateLimiter({ now, hosted });
   const auth = createAuthServer({
     issuer: `${origin}/as`,
     // The lab serves its own fixtures over http on 127.0.0.1; no other private range is opened.
@@ -42,7 +75,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     if (req.method === 'GET' || req.method === 'HEAD') return next();
     const sent = req.headers.origin;
     // A browser always sends Origin on a cross-site write; tools such as the tester send none.
-    if (sent && sent !== origin && sent !== `http://localhost:${port}`) return res.status(403).json({ error: 'cross-origin write refused' });
+    if (sent && sent !== origin && sent !== `http://localhost:${port}` && sent !== publicOrigin) return res.status(403).json({ error: 'cross-origin write refused' });
     next();
   });
 
@@ -59,12 +92,28 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     return res.type(served.contentType ?? 'application/json').send(JSON.stringify(served.body));
   });
 
+  // The lab's own public client document (direction 1 "own document" preset). PingFederate fetches it from here.
+  app.get('/client.json', (req, res) => {
+    const pf = pfSettings(env);
+    if (!pf.ownClientId || !pf.ownRedirectUri) return res.status(404).json({ error: 'not_configured' });
+    res.set('Cache-Control', 'public, max-age=60').json({
+      client_id: pf.ownClientId,
+      client_name: 'CIMD Lab',
+      redirect_uris: [pf.ownRedirectUri],
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none',
+    });
+  });
+
   // The redirect_uri the lab's own client document lists; it only needs to exist.
   app.get('/callback', (req, res) => res.type('text/plain').send('CIMD Lab callback: the code and state are in the address bar.'));
 
   app.get('/api/config', (req, res) => {
     const pf = pfSettings(env);
     res.json({
+      mode: hosted ? 'hosted' : 'local',
+      publicHost,
       pfBase: pf.base,
       ownClientIdConfigured: Boolean(pf.ownClientId),
       clientDev: CLIENT_DEV,
@@ -82,7 +131,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
 
   // Direction 2 tester: probe the lab's own authorization server.
-  app.post('/api/tester/run', async (req, res) => {
+  app.post('/api/tester/run', limit('tester'), async (req, res) => {
     try {
       res.set('Cache-Control', 'no-store').json(await runServerTests({ asBase: `${origin}/as`, fixtureBase: origin, fetchImpl }));
     } catch {
@@ -91,7 +140,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
 
   // Direction 1: the lab as a client of real PingFederate.
-  app.get('/api/pf/status', async (req, res) => {
+  app.get('/api/pf/status', limit('pf-status'), async (req, res) => {
     try {
       res.set('Cache-Control', 'no-store').json(await discoverPf({ base: pfSettings(env).base, fetchImpl }));
     } catch (error) {
@@ -99,7 +148,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     }
   });
 
-  app.post('/api/pf/probe', express.json({ limit: '4kb' }), async (req, res) => {
+  app.post('/api/pf/probe', limit('pf-probe'), express.json({ limit: '4kb' }), async (req, res) => {
     const pf = pfSettings(env);
     try {
       if (req.body?.confirm !== true) return res.status(400).json({ error: 'confirm_required' });
@@ -117,6 +166,8 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     }
   });
 
+  // Hosted state is ephemeral and shared by every visitor: Reset clears only the lab server's in-memory
+  // pending requests and codes (TTL 60 s codes, 5 min pending). Nothing is persisted.
   app.post('/api/reset', (req, res) => {
     auth.reset();
     res.json({ ok: true });

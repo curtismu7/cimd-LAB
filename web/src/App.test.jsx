@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App, { BANNER } from './App.jsx';
+import App, { BANNER, HOSTED_BANNER } from './App.jsx';
 import Verdict, { VERDICTS } from './Verdict.jsx';
 import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
@@ -43,6 +43,30 @@ describe('tabs and cross-cutting chrome', () => {
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     expect(fetch).toHaveBeenCalledWith('/api/reset', expect.objectContaining({ method: 'POST' }));
+  });
+});
+
+describe('hosted banner variant', () => {
+  const configAs = (mode) => vi.stubGlobal('fetch', vi.fn(async (url) => (url === '/api/config' ? json({ mode, publicHost: 'cimd-lab.example', pfBase: 'https://pf.example:9031' }) : json({ ok: true }))));
+
+  it('shows the hosted text in addition to the usual banner, also in presenter mode', async () => {
+    configAs('hosted');
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(new RegExp('^Hosted copy: direction 2 is simulated'))).toHaveTextContent(BANNER);
+    expect(HOSTED_BANNER).toContain('direction 1 uses real PingFederate');
+    await user.click(screen.getByRole('button', { name: 'Presenter mode' }));
+    expect(screen.getByRole('note')).toHaveTextContent(HOSTED_BANNER);
+    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
+  });
+
+  it('does not show it for a local copy', async () => {
+    configAs('local');
+    render(<App />);
+    await screen.findByRole('note');
+    await act(async () => {});
+    expect(screen.getByRole('note')).not.toHaveTextContent('Hosted copy');
+    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
   });
 });
 

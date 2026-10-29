@@ -1,0 +1,136 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const VALUES = { NAMESPACE: 'demo-ns', IMAGE: 'registry.invalid/team/cimd-lab:abc123', SE_HOST: 'cimd-lab.example', PF_BASE_URL: 'https://pf.example:9031' };
+
+function deploy(env, scriptRoot = root) {
+  const result = spawnSync('bash', [path.join(scriptRoot, 'scripts/deploy-se.sh')], {
+    env: { PATH: process.env.PATH, HOME: os.tmpdir(), DRY_RUN: '1', ...env }, encoding: 'utf8',
+  });
+  return { code: result.status, out: result.stdout, err: result.stderr };
+}
+
+test('docker-compose publishes on loopback only', () => {
+  const lines = read('docker-compose.yml').split('\n');
+  const start = lines.findIndex((l) => /^\s*ports:\s*$/.test(l));
+  assert.ok(start >= 0, 'compose has a ports list');
+  const published = [];
+  for (const line of lines.slice(start + 1)) {
+    const item = /^\s*-\s*(.+?)\s*$/.exec(line);
+    if (!item) break;
+    published.push(item[1].replace(/["']/g, ''));
+  }
+  assert.deepEqual(published, ['127.0.0.1:5250:5250']);
+});
+
+test('Dockerfile: Node 22 alpine, npm ci, non-root, no secrets baked in', () => {
+  const dockerfile = read('Dockerfile');
+  assert.match(dockerfile, /FROM node:22-alpine AS build/);
+  assert.match(dockerfile, /npm ci/);
+  assert.match(dockerfile, /^USER node$/m);
+  assert.doesNotMatch(dockerfile, /COPY \.env|PF_BASE_URL=/);
+  assert.match(read('.dockerignore'), /^\.env$/m);
+});
+
+test('deploy dry run renders every manifest with no leftover token', () => {
+  const { code, out, err } = deploy(VALUES);
+  assert.equal(code, 0, err);
+  assert.doesNotMatch(out, /__[A-Z0-9_]+__/);
+  assert.match(out, /DRY RUN: would apply to namespace 'demo-ns'/);
+  for (const kind of ['kind: ConfigMap', 'kind: Deployment', 'kind: Service', 'kind: Ingress']) assert.ok(out.includes(kind), kind);
+  assert.ok(out.includes(`image: ${VALUES.IMAGE}`));
+  assert.ok(out.includes('value: "https://cimd-lab.example/client.json"'));
+  assert.ok(out.includes('value: "https://cimd-lab.example/callback"'));
+  assert.ok(out.includes('PF_BASE_URL: "https://pf.example:9031"'));
+  assert.ok(out.includes('value: hosted'));
+});
+
+test('manifests: non-root, read-only root filesystem, probes, limits, no namespace, no secrets', () => {
+  const { out } = deploy(VALUES);
+  assert.match(out, /runAsNonRoot: true/);
+  assert.match(out, /readOnlyRootFilesystem: true/);
+  assert.match(out, /allowPrivilegeEscalation: false/);
+  assert.match(out, /readinessProbe:\n\s+httpGet: \{ path: \/api\/health/);
+  assert.match(out, /livenessProbe:\n\s+httpGet: \{ path: \/api\/health/);
+  assert.match(out, /limits: \{ cpu: 500m, memory: 256Mi \}/);
+  assert.match(out, /emptyDir/);
+  assert.doesNotMatch(out, /^\s*namespace:/m);
+  assert.doesNotMatch(out, /kind: Secret|secretKeyRef|secretName/);
+  assert.match(out, /name: PORT, value: "5250"/);
+});
+
+test('deploy refuses missing or unsafe inputs, and a leftover __TOKEN__', () => {
+  for (const name of Object.keys(VALUES)) {
+    const env = { ...VALUES }; delete env[name];
+    const r = deploy(env);
+    assert.equal(r.code, 2, `${name} is required`);
+    assert.match(r.err, new RegExp(name));
+  }
+  assert.equal(deploy({ ...VALUES, IMAGE: 'registry.invalid/x:latest' }).code, 2);
+  assert.equal(deploy({ ...VALUES, IMAGE: 'registry.invalid/x' }).code, 2);
+  assert.equal(deploy({ ...VALUES, PF_BASE_URL: 'http://pf.example' }).code, 2);
+  assert.equal(deploy({ ...VALUES, PF_BASE_URL: 'https://user:pw@pf.example' }).code, 2);
+  assert.equal(deploy({ ...VALUES, SE_HOST: 'a.example|b' }).code, 2);
+  // Without DRY_RUN the script must not touch a cluster without owner approval.
+  const real = deploy({ ...VALUES, DRY_RUN: '' });
+  assert.equal(real.code, 2);
+  assert.match(real.err, /owner-approved/);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cimd-deploy-'));
+  fs.cpSync(path.join(root, 'k8s'), path.join(tmp, 'k8s'), { recursive: true });
+  fs.cpSync(path.join(root, 'scripts'), path.join(tmp, 'scripts'), { recursive: true });
+  fs.appendFileSync(path.join(tmp, 'k8s/service.yaml'), '# stray __UNKNOWN_TOKEN__\n');
+  const leftover = deploy(VALUES, tmp);
+  assert.equal(leftover.code, 3);
+  assert.match(leftover.err, /__UNKNOWN_TOKEN__/);
+});
+
+test('the hosted deployment names no secret and the repo carries no hosts other than client.dev, *.example, *.invalid', () => {
+  const env = read('k8s/deployment.yaml');
+  assert.doesNotMatch(env.replace(/^#.*$/gm, ''), /password|secretKeyRef|client_secret|api[_-]?key/i);
+  // Test files carry hostile fixtures (private and metadata addresses) on purpose, so only shipped files are scanned.
+  const skip = new Set(['node_modules', '.git', 'dist', 'test']);
+  const hosts = new Set();
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (skip.has(e.name)) continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(js|jsx|json|md|ya?ml|sh|mjs|html)$/.test(e.name) && e.name !== 'package-lock.json' && !/\.test\./.test(e.name)) {
+        for (const m of fs.readFileSync(p, 'utf8').matchAll(/https?:\/\/([a-z0-9][a-z0-9.-]*)/gi)) hosts.add(m[1].toLowerCase());
+      }
+    }
+  };
+  walk(root);
+  // IP literals are the tester's deliberate private-address cases; 'user' is the userinfo part of its credentials-in-URL case.
+  const allowed = (h) => /^[0-9.]+$/.test(h) || h === 'user' || h === 'client.dev' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.example') || h.endsWith('.invalid');
+  assert.deepEqual([...hosts].filter((h) => !allowed(h)).sort(), []);
+});
+
+test('content pack and shelf entry are well formed and portable', () => {
+  const pack = JSON.parse(read('content-pack.json'));
+  assert.equal(pack.schema, 'demo-content-pack/1');
+  assert.equal(pack.demo.id, 'cimd-lab');
+  const shelf = JSON.parse(read('docs/shelf-entry.json'));
+  assert.equal(shelf.id, 'cimd-lab');
+  assert.equal(shelf.healthPath, '/api/health');
+  assert.ok(!path.isAbsolute(shelf.composeFile) && fs.existsSync(path.join(root, shelf.composeFile)));
+});
+
+test('CI: self-hosted runner, checkout v5, Node 22 on PRs and 20+22 on main, scans present', () => {
+  const ci = read('.github/workflows/ci.yml');
+  assert.match(ci, /actions\/checkout@v5/);
+  assert.match(ci, /actions\/setup-node@v5/);
+  assert.match(ci, /fromJSON\('\[22\]'\)/);
+  assert.match(ci, /fromJSON\('\[20, 22\]'\)/);
+  assert.match(ci, /gitleaks/);
+  assert.match(ci, /forbidden-strings/);
+  assert.match(ci, /conformance\.mjs/);
+});
