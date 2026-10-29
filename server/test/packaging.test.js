@@ -83,13 +83,61 @@ test('deploy refuses missing or unsafe inputs, and a leftover __TOKEN__', () => 
   assert.equal(real.code, 2);
   assert.match(real.err, /owner-approved/);
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cimd-deploy-'));
-  fs.cpSync(path.join(root, 'k8s'), path.join(tmp, 'k8s'), { recursive: true });
-  fs.cpSync(path.join(root, 'scripts'), path.join(tmp, 'scripts'), { recursive: true });
+  const tmp = copyRepoParts();
   fs.appendFileSync(path.join(tmp, 'k8s/service.yaml'), '# stray __UNKNOWN_TOKEN__\n');
   const leftover = deploy(VALUES, tmp);
   assert.equal(leftover.code, 3);
   assert.match(leftover.err, /__UNKNOWN_TOKEN__/);
+});
+
+function copyRepoParts() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cimd-deploy-'));
+  fs.cpSync(path.join(root, 'k8s'), path.join(tmp, 'k8s'), { recursive: true });
+  fs.cpSync(path.join(root, 'scripts'), path.join(tmp, 'scripts'), { recursive: true });
+  return tmp;
+}
+
+test('deploy dry run: a leftover token in ANY file, even the last, fails before a single manifest is printed', () => {
+  for (const file of ['configmap.yaml', 'deployment.yaml', 'service.yaml', 'ingress.yaml']) {
+    const tmp = copyRepoParts();
+    fs.appendFileSync(path.join(tmp, 'k8s', file), '# stray __LEFT_OVER__\n');
+    const r = deploy(VALUES, tmp);
+    assert.equal(r.code, 3, file);
+    assert.match(r.err, new RegExp(`${file}: __LEFT_OVER__`), file);
+    assert.equal(r.out, '', `${file}: nothing was printed before the check`);
+  }
+});
+
+test('deploy with approval applies nothing when a later file has a leftover token (fake kubectl records calls)', () => {
+  const tmp = copyRepoParts();
+  fs.appendFileSync(path.join(tmp, 'k8s/ingress.yaml'), '# stray __LEFT_OVER__\n');
+  const bin = path.join(tmp, 'bin');
+  fs.mkdirSync(bin);
+  const log = path.join(tmp, 'kubectl.log');
+  fs.writeFileSync(path.join(bin, 'kubectl'), `#!/bin/sh\necho "$@" >> "${log}"\n`, { mode: 0o755 });
+  const run = (scriptRoot, extra = {}) => spawnSync('bash', [path.join(scriptRoot, 'scripts/deploy-se.sh')], {
+    env: { PATH: `${bin}:${process.env.PATH}`, HOME: os.tmpdir(), OWNER_APPROVED: '1', ...VALUES, ...extra }, encoding: 'utf8',
+  });
+  const bad = run(tmp);
+  assert.equal(bad.status, 3);
+  assert.equal(fs.existsSync(log), false, 'kubectl was never called');
+  // The same fake kubectl is called for a clean tree, which proves the guard above is what stopped it.
+  const clean = copyRepoParts();
+  const ok = run(clean);
+  assert.equal(ok.status, 0, ok.stderr);
+  const calls = fs.readFileSync(log, 'utf8').trim().split('\n');
+  assert.equal(calls.filter((c) => /apply -f/.test(c)).length, 4);
+  assert.match(calls.at(-1), /rollout status deployment\/cimd-lab/);
+});
+
+test('deploy refuses an IMAGE containing & | or \\ with an accurate message', () => {
+  for (const bad of ['registry.invalid/x&y:1', 'registry.invalid/x|y:1', 'registry.invalid/x\\y:1', 'registry.invalid/x:1&']) {
+    const r = deploy({ ...VALUES, IMAGE: bad });
+    assert.equal(r.code, 2, bad);
+    assert.ok(r.err.includes("IMAGE must not contain '&', '|' or '\\'"), `${bad}: ${r.err}`);
+    assert.equal(r.out, '', bad);
+  }
+  assert.match(deploy({ ...VALUES, IMAGE: 'registry.invalid/x y:1' }).err, /IMAGE must be a plain reference/);
 });
 
 test('the hosted deployment names no secret and the repo carries no hosts other than client.dev, *.example, *.invalid', () => {
@@ -133,4 +181,21 @@ test('CI: self-hosted runner, checkout v5, Node 22 on PRs and 20+22 on main, sca
   assert.match(ci, /gitleaks/);
   assert.match(ci, /forbidden-strings/);
   assert.match(ci, /conformance\.mjs/);
+});
+
+test('PF_BASE_URL has no default anywhere shipped: .env.example and compose are empty, README and CLAUDE.md say so', () => {
+  assert.match(read('.env.example'), /^PF_BASE_URL=$/m);
+  assert.match(read('docker-compose.yml'), /PF_BASE_URL: "\$\{PF_BASE_URL:-\}"/);
+  assert.doesNotMatch(read('README.md') + read('CLAUDE.md'), /default `?https:\/\/localhost:9031/);
+  assert.match(read('README.md'), /no default/i);
+  assert.doesNotMatch(read('server/src/pf.js'), /localhost:9031/);
+});
+
+test('doctor with PF_BASE_URL unset says so plainly and contacts no PingFederate', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cimd-doctor-'));
+  for (const dir of ['scripts', 'server']) fs.cpSync(path.join(root, dir), path.join(tmp, dir), { recursive: true, filter: (src) => !src.includes('node_modules') });
+  fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'));
+  const result = spawnSync(process.execPath, [path.join(tmp, 'scripts/doctor.mjs')], { env: { PATH: process.env.PATH, HOME: os.tmpdir() }, encoding: 'utf8' });
+  assert.match(result.stdout, /PingFederate is not configured: set PF_BASE_URL/);
+  assert.doesNotMatch(result.stdout, /PingFederate discovery answered|did not answer|PF_BASE_URL is /);
 });

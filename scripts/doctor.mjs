@@ -1,4 +1,4 @@
-// npm run doctor: plain-line checks. Contacts only the configured PF_BASE_URL (and this app on loopback).
+// npm run doctor: plain-line checks. Contacts only the configured PF_BASE_URL (and this app on loopback). With PF_BASE_URL unset it contacts no PingFederate.
 import fs from 'node:fs';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -45,16 +45,20 @@ line(fs.existsSync(path.join(root, 'web/dist/index.html')), 'Web UI built (npm r
 
 const env = loadDotEnv();
 const { base } = pfSettings(env);
-note(`PF_BASE_URL is ${base}`);
-try {
-  const d = await discoverPf({ base });
-  if (!d.reachable) line(false, `PingFederate did not answer at ${base}`);
-  else if (d.status !== 200) line(false, d.detail);
-  else {
-    line(true, 'PingFederate discovery answered');
-    note(d.cimdSupported ? 'Discovery advertises CIMD support' : 'Discovery does not advertise CIMD support (the probe can still show what PingFederate does)');
+if (!base) {
+  note('PingFederate is not configured: set PF_BASE_URL (direction 1 is off, nothing is contacted; direction 2 still works)');
+} else {
+  note(`PF_BASE_URL is ${base}`);
+  try {
+    const d = await discoverPf({ base });
+    if (!d.reachable) line(false, `PingFederate did not answer at ${base}`);
+    else if (d.status !== 200) line(false, d.detail);
+    else {
+      line(true, 'PingFederate discovery answered');
+      note(d.cimdSupported ? 'Discovery advertises CIMD support' : 'Discovery does not advertise CIMD support (the probe can still show what PingFederate does)');
+    }
+  } catch (error) {
+    line(false, error instanceof PfRefused ? error.message : 'PingFederate check failed');
   }
-} catch (error) {
-  line(false, error instanceof PfRefused ? error.message : 'PingFederate check failed');
 }
 process.exit(failures ? 1 : 0);

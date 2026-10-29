@@ -18,7 +18,7 @@
 
 ## Run
 
-Needs Node 20 or newer. Docker alternative: `docker compose up --build -d` publishes `127.0.0.1:5250` only (set `PF_BASE_URL` in your shell or a `.env` beside the compose file).
+Needs Node 20 or newer. Docker alternative: `docker compose up --build -d` publishes `127.0.0.1:5250` only (set `PF_BASE_URL` in your shell or a `.env` beside the compose file; it has no default).
 
 ```
 npm install
@@ -29,7 +29,8 @@ npm test             # node --test, Node 20 and 22
 
 Direction 1 settings (environment):
 
-- `PF_BASE_URL` - PingFederate base, default `https://localhost:9031`. https only (http on loopback).
+- `PF_BASE_URL` - PingFederate base. **There is no default**: unset means direction 1 is off, `/api/pf/status` and `/api/pf/probe` answer 409 `pf_not_configured`, no request is made, and the UI says "PingFederate is not configured: set PF_BASE_URL" with the buttons disabled. https only (http on loopback).
+- `ALLOWED_CLIENT_HOSTS` - optional comma list of client_id hosts the lab's own teaching server will fetch from; any other host is refused before a request is made (`host_not_allowed`). Unset means no allow-list.
 - `CIMD_CLIENT_ID_URL`, `CIMD_REDIRECT_URI` - the public https address of this lab's own client document and its callback, which PingFederate must be able to reach. Unset means the "own document" probe is unavailable.
 
 ## Direction 2: the tester
@@ -39,7 +40,12 @@ Direction 1 settings (environment):
 ## Known limits
 
 - The SSRF guard resolves the host, then `fetch` resolves it again. A rebinding DNS answer could differ between the two. A production server pins the resolved address.
-- The lab serves its own fixtures over `http://127.0.0.1` (the `allowLoopback` switch). Nothing else private is opened.
+- The lab fetches its own fixtures over `http://127.0.0.1:<its own port>/fixtures/...` (the `allowLoopback` switch). It opens only that origin and path prefix; any other loopback port or path is refused without a request. Nothing else private is opened.
+- **DNS rebinding.** Resolve-then-fetch gap, as above: the lab checks the addresses a name resolves to, but `fetch` resolves the name again, so a rebinding answer could differ. Pinning the resolved address (a custom dispatcher) is not done.
+- **Hosted state is shared.** In hosted mode every visitor shares one in-memory authorization server (pending requests, codes) and Reset clears it for everyone. Rulebook section 6 asks for per-visitor isolation through a workspace id; this build does not do that. It is ephemeral, holds no secrets, and the banner says so, but it is a deviation, not conformance.
+- **Rule 14 (trace propagation) is partly covered.** The tester and the PingFederate requests send a W3C `traceparent` and show it; the lab's own server does not read, log or propagate an incoming one.
+- **The probe target is configured, not typed.** Direction 1 contacts only the origin in `PF_BASE_URL`, set by whoever runs the lab. Rulebook section 2 describes a user-typed origin; here nobody types one, which is narrower, and the confirm gate and presets still apply.
+- The validator rejects a `client_id` that is not already in canonical URL form (dot segments, fragments, queries, uppercase scheme or host, trailing-dot host, default port, non-ASCII host, whitespace); redirect URIs with `javascript:`, `data:`, `vbscript:`, a fragment, a wildcard or public `http:` are errors, and custom app schemes are a warning.
 
 ## Credit
 
@@ -54,12 +60,13 @@ The document rules are ported from client.dev (MIT, Copyright (c) Stytch). See `
 `MODE=hosted` binds `0.0.0.0` and accepts the `Host` named in `PUBLIC_HOST` (exact) as well as the loopback names; `https://$PUBLIC_HOST` counts as the same origin for writes. Without `MODE=hosted` nothing changes: loopback-only bind, loopback Host names only.
 
 - `GET /client.json` is the lab's own public CIMD document, built from `CIMD_CLIENT_ID_URL` and `CIMD_REDIRECT_URI` (404 `not_configured` if either is unset). It passes the lab's own validator.
-- In hosted mode `POST /api/pf/probe`, `POST /api/tester/run` and `GET /api/pf/status` are limited to 10 requests a minute per client address (429). The address is the rightmost `X-Forwarded-For` entry, used only in hosted mode.
+- In hosted mode `POST /api/pf/probe`, `POST /api/tester/run`, `GET /api/pf/status` and `POST /api/validate` are limited to 10 requests a minute per client address (429), `GET /as/authorize` to 30 a minute and `POST /api/reset` to 3 a minute. Each route has its own bucket. The address is the rightmost `X-Forwarded-For` entry, used only in hosted mode.
+- Every error is a JSON `{error}` (`bad_request`, `payload_too_large`, `not_found`, `server_error`), never an HTML page, stack or path.
 - State is ephemeral and shared by every visitor: the teaching server keeps pending requests (5 minutes) and codes (60 seconds) in memory, nothing is persisted, and Reset clears only that in-memory state for everyone. The hosted banner says so.
 - One replica on purpose (in-memory state and rate-limit counters).
 - Deploy (owner-approved, never run by an agent): build and push the image yourself, then
   `OWNER_APPROVED=1 NAMESPACE=<ns> IMAGE=<registry>/cimd-lab:<tag> SE_HOST=<host> PF_BASE_URL=<https PingFederate base> scripts/deploy-se.sh`.
-  `DRY_RUN=1` prints every rendered manifest and applies nothing; it fails if any `__TOKEN__` is left. `NAMESPACE`, `IMAGE`, `SE_HOST` and `PF_BASE_URL` have no defaults. Ingress class and TLS secret are the cluster owner's choice (UNVERIFIED, not named in the manifest). After deploying, verify by content: `/api/health` says `demo-health/1` and the page carries the hosted banner.
+  `DRY_RUN=1` prints every rendered manifest and applies nothing. The script renders all files to a temp directory first and fails, before printing or applying anything, if any `__TOKEN__` is left in any of them; an `IMAGE` containing `&`, `|` or `\` is refused. `NAMESPACE`, `IMAGE`, `SE_HOST` and `PF_BASE_URL` have no defaults. Ingress class and TLS secret are the cluster owner's choice (UNVERIFIED, not named in the manifest). After deploying, verify by content: `/api/health` says `demo-health/1` and the page carries the hosted banner.
 - Known limit: in hosted mode the teaching server still calls itself over loopback, so its issuer and fixture URLs show the loopback address, not the public host.
 
 ## PingFederate setup (owner-run, direction 1)
