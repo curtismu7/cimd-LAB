@@ -1,0 +1,12 @@
+{
+  "id": "cimd-lab",
+  "name": "CIMD Lab",
+  "kind": "Demo",
+  "description": "Teaches OAuth Client ID Metadata Documents both ways: real PingFederate as the authorization server (owner-run, no mock), and the lab's own teaching server with a tester that breaks the document in a dozen ways. PingFederate acting as a CIMD client is UNVERIFIED.",
+  "url": "http://localhost:5250",
+  "healthPath": "/api/health",
+  "composeFile": "docker-compose.yml",
+  "composeOverlays": [],
+  "port": 5250,
+  "notes": "Host-run: npm install && npm run build && npm start (port 5250, loopback only). Or: docker compose up --build -d (publishes 127.0.0.1:5250 only). Edit composeFile to this checkout's absolute path. No catalog row matches, so there is no catalogId. Direction 1 needs PF_BASE_URL (real PingFederate)."
+}

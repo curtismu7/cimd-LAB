@@ -7,6 +7,8 @@
 | 1. PingFederate as server | This lab (and client.dev's public example document) | **Real PingFederate** | Local PingFederate, owner-run |
 | 2. Lab as server | A client.dev-style tester | This lab's own CIMD-capable authorization server | In process, offline |
 
+**Two forms (rule 18), with a recorded exception.** (a) Local standalone: `npm start` or Docker on OrbStack. (b) A hosted build for the US SE k8s cluster (`MODE=hosted`). Because direction 1 uses real PingFederate only, the hosted build is **not** a "mock-only" build: direction 2 is fully self-contained and simulated by the lab's teaching server, and direction 1 contacts only the one configured `PF_BASE_URL` (its public discovery document and one authorize GET; no credentials, no secrets in the manifests or the image). Owner decision 2026-10-28; exception to rules 1 and 18.
+
 ## What is simulated, and what is not
 
 - **Direction 1 uses real PingFederate only.** There is no PingFederate mock. This is an owner decision (2026-10-28) and an exception to standalone rules 1 and 18; the exception is recorded on the board.
@@ -15,6 +17,8 @@
 - The tests that touch PingFederate use canned replies to test this lab's parsing; they prove nothing about PingFederate itself.
 
 ## Run
+
+Needs Node 20 or newer. Docker alternative: `docker compose up --build -d` publishes `127.0.0.1:5250` only (set `PF_BASE_URL` in your shell or a `.env` beside the compose file).
 
 ```
 npm install
@@ -45,7 +49,32 @@ The document rules are ported from client.dev (MIT, Copyright (c) Stytch). See `
 
 `npm run build` builds `web/dist`, and `npm start` serves it with the API on http://127.0.0.1:5250. For UI work run `npm start` and `npm run dev:web` (Vite on http://127.0.0.1:5251, proxying `/api`). Four tabs: Learn, PingFederate as server, Lab as server, Talk track (`docs/talk-track.md`). Diagrams are `diagram-studio/1` JSON in `web/src/diagrams`. `npm run doctor` checks Node, port 5250 and the configured PingFederate (the only host it contacts).
 
-## State (step 2 of 3, web)
+## Hosted build (SE cluster)
 
-Done: validator, SSRF-guarded fetch, authorization server, tester, PingFederate client, API, web UI with three ReactFlow diagrams, presenter mode, Reset, doctor, talk track, 25 server tests and 22 web tests.
-Not yet: Learning Hub pack, shelf entry, CI, SE build, health/Docker packaging, conformance run. Not verified in a browser yet.
+`MODE=hosted` binds `0.0.0.0` and accepts the `Host` named in `PUBLIC_HOST` (exact) as well as the loopback names; `https://$PUBLIC_HOST` counts as the same origin for writes. Without `MODE=hosted` nothing changes: loopback-only bind, loopback Host names only.
+
+- `GET /client.json` is the lab's own public CIMD document, built from `CIMD_CLIENT_ID_URL` and `CIMD_REDIRECT_URI` (404 `not_configured` if either is unset). It passes the lab's own validator.
+- In hosted mode `POST /api/pf/probe`, `POST /api/tester/run` and `GET /api/pf/status` are limited to 10 requests a minute per client address (429). The address is the rightmost `X-Forwarded-For` entry, used only in hosted mode.
+- State is ephemeral and shared by every visitor: the teaching server keeps pending requests (5 minutes) and codes (60 seconds) in memory, nothing is persisted, and Reset clears only that in-memory state for everyone. The hosted banner says so.
+- One replica on purpose (in-memory state and rate-limit counters).
+- Deploy (owner-approved, never run by an agent): build and push the image yourself, then
+  `OWNER_APPROVED=1 NAMESPACE=<ns> IMAGE=<registry>/cimd-lab:<tag> SE_HOST=<host> PF_BASE_URL=<https PingFederate base> scripts/deploy-se.sh`.
+  `DRY_RUN=1` prints every rendered manifest and applies nothing; it fails if any `__TOKEN__` is left. `NAMESPACE`, `IMAGE`, `SE_HOST` and `PF_BASE_URL` have no defaults. Ingress class and TLS secret are the cluster owner's choice (UNVERIFIED, not named in the manifest). After deploying, verify by content: `/api/health` says `demo-health/1` and the page carries the hosted banner.
+- Known limit: in hosted mode the teaching server still calls itself over loopback, so its issuer and fixture URLs show the loopback address, not the public host.
+
+## PingFederate setup (owner-run, direction 1)
+
+The probe needs three objects in the PingFederate the owner points `PF_BASE_URL` at. Their ids:
+
+| Object | Id |
+|---|---|
+| CIMD policy for client.dev's example document | `cimdLabClientDev` |
+| Reference access token manager | `cimdLabRefAtm` |
+| Access token mapping | `authz_req\|aiDemoPfHtmlForm\|cimdLabRefAtm` |
+
+**Roll back** by deleting those three objects (the mapping first, then the access token manager, then the policy). Nothing else in PingFederate is changed by this lab, and the lab never writes to PingFederate.
+
+## State (step 3 of 3, integration)
+
+Done: validator, SSRF-guarded fetch, authorization server, tester, PingFederate client, API, web UI with three ReactFlow diagrams, presenter mode, Reset, doctor, talk track, hosted mode (Host, rate limit, `/client.json`, banner), Dockerfile and compose, k8s manifests and `scripts/deploy-se.sh`, `ci.yml`, Learning Hub pack, shelf entry.
+Not done: no GitHub repo, no image pushed, no SE deploy, no browser proof of the hosted build, and the pack's `catalog` is the placeholder `X0` (the validator requires one and no catalog row matches yet; the owner assigns it).

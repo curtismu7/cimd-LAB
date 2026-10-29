@@ -1,0 +1,30 @@
+{
+  "schema": "demo-content-pack/1",
+  "id": "cimd-lab",
+  "title": "CIMD Lab: client ID metadata documents, both directions",
+  "version": "0.1.0",
+  "demo": {
+    "id": "cimd-lab",
+    "name": "CIMD Lab",
+    "catalog": "X0",
+    "baseUrl": "http://127.0.0.1:5250",
+    "doctor": "/api/health",
+    "tags": ["cimd", "oauth", "pingfederate", "client-registration"]
+  },
+  "glossary": [
+    { "id": "cimd", "term": "CIMD", "definition": "Client ID Metadata Document. The client's client_id is an https URL, and the authorization server fetches the JSON document behind it instead of requiring registration first." },
+    { "id": "client-id-url", "term": "client_id URL", "definition": "An https URL with a path, no fragment, no query and no credentials. The document served there must repeat the same URL as its client_id." },
+    { "id": "dcr", "term": "Dynamic client registration", "definition": "The older way to avoid manual registration: the client POSTs its metadata and the server keeps a record. CIMD keeps no record per client up front." },
+    { "id": "ssrf", "term": "SSRF guard", "definition": "A stranger chooses the document URL, so the server refuses private, loopback and cloud-metadata addresses, redirects, oversize bodies and slow answers." },
+    { "id": "direction-1", "term": "Direction 1", "definition": "PingFederate is the authorization server and the lab is the client. Real PingFederate only; there is no mock of it." },
+    { "id": "direction-2", "term": "Direction 2", "definition": "The lab's own teaching authorization server accepts a URL as client_id, and a tester shows each way a document is refused." }
+  ],
+  "sources": [
+    { "id": "client-dev", "title": "client.dev: CIMD tester and example document", "url": "https://client.dev/", "kind": "reference", "use": "Document rules ported (MIT, Stytch) and the public example document used as a preset.", "status": "read", "checked": "2026-10-29" }
+  ],
+  "cards": [
+    { "id": "learn", "label": "What CIMD is", "group": "concept", "description": "Registration versus a URL client_id, the document fields and the rules a server enforces, with a diagram you can step through.", "action": { "type": "route", "href": "/" }, "terms": ["cimd", "client-id-url", "dcr"] },
+    { "id": "try-tester", "label": "Break the document twelve ways", "group": "try-it", "description": "Run the tester against the lab's own server: a correct document passes, each broken one is refused for the right reason.", "action": { "type": "route", "href": "/" }, "terms": ["direction-2", "ssrf"] },
+    { "id": "try-pf", "label": "Probe real PingFederate", "group": "try-it", "description": "Owner-run: show what PingFederate does with a URL client_id. No credentials are used. Whether PingFederate can be a CIMD client is not verified.", "action": { "type": "route", "href": "/" }, "terms": ["direction-1"] }
+  ]
+}

@@ -2,6 +2,8 @@
 
 Nine short beats. Each is also a presenter note. Use the arrow keys in presenter mode to step the diagram on screen.
 
+On the hosted copy (the banner says so), say it plainly: direction 2 is simulated by the lab's teaching server, direction 1 uses real PingFederate, and state is ephemeral and shared by everyone watching, so Reset affects them too.
+
 ## 1. The registration problem
 - A client that wants to use an authorization server has to register with it first.
 - Every server keeps a record per client, and every client repeats this for every server.
