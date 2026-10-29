@@ -107,7 +107,7 @@ test('API: list, render per vertical, unknown vertical is 404, customer cast is 
     assert.equal(list.default, 'healthcare');
     const story = await (await fetch(`${lab.base}/api/stories/banking`)).json();
     assert.equal(story.vertical, 'banking');
-    assert.match(story.beats[1].story, /Custom Health/);
+    assert.match(story.beats[0].story, /Custom Health/);
     for (const bad of ['mining', '__proto__', 'constructor']) {
       const r = await fetch(`${lab.base}/api/stories/${bad}`);
       assert.equal(r.status, 404, bad);
