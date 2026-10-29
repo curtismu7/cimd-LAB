@@ -23,14 +23,14 @@ async function start(env, extra = {}) {
   return { port, attempts, base: `http://127.0.0.1:${port}`, close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }) };
 }
 
-const raw = (port, { method = 'GET', path = '/', headers = {} }) => new Promise((resolve, reject) => {
+const raw = (port, { method = 'GET', path = '/', headers = {}, body }) => new Promise((resolve, reject) => {
   const req = http.request({ host: '127.0.0.1', port, method, path, headers }, (res) => {
     let body = '';
     res.on('data', (c) => { body += c; });
     res.on('end', () => resolve({ status: res.statusCode, body, headers: res.headers }));
   });
   req.on('error', reject);
-  req.end();
+  req.end(body);
 });
 
 test('hosted: PUBLIC_HOST is accepted in addition to loopback, other hosts are not', async () => {
@@ -126,5 +126,57 @@ test('hosted: reset clears only in-memory authorization server state and answers
     const response = await fetch(`${lab.base}/api/reset`, { method: 'POST' });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true });
+  } finally { await lab.close(); }
+});
+
+test('hosted: /as/authorize (30 a minute), /api/validate (10) and /api/reset (3) are limited per client address', async () => {
+  let clock = 5_000_000;
+  const lab = await start(HOSTED, { now: () => clock });
+  try {
+    const headers = (ip) => ({ host: 'cimd-lab.example', 'x-forwarded-for': ip, 'content-type': 'application/json' });
+    const routes = {
+      authorize: { cap: 30, call: (ip) => raw(lab.port, { path: '/as/authorize?response_type=token', headers: headers(ip) }) },
+      validate: { cap: 10, call: (ip) => raw(lab.port, { method: 'POST', path: '/api/validate', headers: headers(ip), body: '{"document":{}}' }) },
+      reset: { cap: 3, call: (ip) => raw(lab.port, { method: 'POST', path: '/api/reset', headers: headers(ip) }) },
+    };
+    let n = 0;
+    for (const [name, { cap, call }] of Object.entries(routes)) {
+      const ip = `203.0.113.${(n += 1) * 10}`;
+      const codes = [];
+      for (let i = 0; i < cap + 1; i += 1) codes.push((await call(ip)).status);
+      assert.deepEqual(codes.slice(0, cap).filter((c) => c === 429), [], `${name}: nothing limited before the cap`);
+      assert.equal(codes[cap], 429, `${name}: request ${cap + 1} is limited`);
+      const limited = await call(ip);
+      assert.equal(limited.status, 429);
+      assert.deepEqual(JSON.parse(limited.body), { error: 'rate_limited' });
+      assert.ok(Number(limited.headers['retry-after']) > 0, `${name}: Retry-After`);
+      assert.notEqual((await call('198.51.100.77')).status, 429, `${name}: another address is unaffected`);
+      // a spoofed leading X-Forwarded-For entry does not buy a fresh bucket
+      assert.equal((await call(`1.2.3.4, ${ip}`)).status, 429, `${name}: spoofed prefix`);
+      clock += 61_000;
+      assert.notEqual((await call(ip)).status, 429, `${name}: window passes`);
+    }
+    assert.deepEqual([...new Set(lab.attempts)], [], 'none of these routes made an outbound call');
+  } finally { await lab.close(); }
+});
+
+test('hosted: reset is limited on its own bucket, so other routes stay usable after 3 resets', async () => {
+  const lab = await start(HOSTED, { now: () => 9_000_000 });
+  try {
+    const headers = { host: 'cimd-lab.example', 'x-forwarded-for': '203.0.113.99' };
+    for (let i = 0; i < 4; i += 1) await raw(lab.port, { method: 'POST', path: '/api/reset', headers });
+    assert.equal((await raw(lab.port, { method: 'POST', path: '/api/reset', headers })).status, 429);
+    assert.notEqual((await raw(lab.port, { path: '/api/pf/status', headers })).status, 429);
+  } finally { await lab.close(); }
+});
+
+test('local mode: the extra limits do not apply', async () => {
+  const lab = await start({ ...HOSTED, MODE: undefined });
+  try {
+    for (let i = 0; i < 40; i += 1) assert.equal((await fetch(`${lab.base}/as/authorize?response_type=token`)).status, 400);
+    for (let i = 0; i < 12; i += 1) {
+      assert.equal((await fetch(`${lab.base}/api/validate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"document":{}}' })).status, 200);
+    }
+    for (let i = 0; i < 6; i += 1) assert.equal((await fetch(`${lab.base}/api/reset`, { method: 'POST' })).status, 200);
   } finally { await lab.close(); }
 });

@@ -66,6 +66,14 @@ export function createAuthServer({
     if (!/^https?:\/\//i.test(clientId)) fail('invalid_client', 'client_id_is_url', 'client_id must be a URL: this server has no registered clients');
     pass('client_id_is_url', clientId);
 
+    // Before any request leaves: a host that is not on the allow-list is never contacted.
+    if (allowedHosts) {
+      let host = '';
+      try { host = new URL(clientId).hostname.toLowerCase(); } catch { /* fetchDocument refuses it below */ }
+      if (host && !allowedHosts.has(host)) fail('invalid_client', 'host_not_allowed', 'This server only trusts documents from hosts on its allow-list');
+      if (host) pass('host_allowed', host);
+    }
+
     let document;
     try {
       document = await fetchDocument(clientId, fetchOptions);
@@ -74,9 +82,6 @@ export function createAuthServer({
       throw error;
     }
     pass('fetched', 'HTTPS, public host, no redirect, size cap, JSON');
-
-    if (allowedHosts && !allowedHosts.has(new URL(clientId).hostname)) fail('invalid_client', 'host_not_allowed', 'This server only trusts documents from hosts on its allow-list');
-    if (allowedHosts) pass('host_allowed', new URL(clientId).hostname);
 
     const verdict = validateCimdDocument(document, clientId, { allowLoopback: Boolean(fetchOptions.allowLoopback) });
     if (!verdict.valid) {

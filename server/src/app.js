@@ -13,6 +13,8 @@ const MAX_PASTED_BYTES = 16 * 1024;
 const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
 const RATE_LIMIT = 10;
+const AUTHORIZE_RATE_LIMIT = 30;
+const RESET_RATE_LIMIT = 3;
 const RATE_WINDOW_MS = 60_000;
 const MAX_RATE_KEYS = 2000;
 
@@ -20,14 +22,14 @@ const MAX_RATE_KEYS = 2000;
 // entry is the address the ingress itself saw, so it is the one a visitor cannot forge.
 function createRateLimiter({ now, hosted }) {
   const hits = new Map();
-  return (name) => (req, res, next) => {
+  return (name, max = RATE_LIMIT) => (req, res, next) => {
     if (!hosted) return next();
     const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',').map((part) => part.trim()).filter(Boolean);
     const ip = forwarded.at(-1) ?? req.socket.remoteAddress ?? 'unknown';
     const key = `${name}|${ip}`;
     const t = now();
     const recent = (hits.get(key) ?? []).filter((at) => at > t - RATE_WINDOW_MS);
-    if (recent.length >= RATE_LIMIT) {
+    if (recent.length >= max) {
       res.set('Retry-After', String(Math.ceil((recent[0] + RATE_WINDOW_MS - t) / 1000)));
       return res.status(429).json({ error: 'rate_limited' });
     }
@@ -37,6 +39,16 @@ function createRateLimiter({ now, hosted }) {
     while (hits.size > MAX_RATE_KEYS) hits.delete(hits.keys().next().value);
     return next();
   };
+}
+
+// Every error is JSON with a fixed code: no message, stack or path ever reaches the client.
+export function jsonErrorHandler(err, req, res, next) {
+  if (res.headersSent) return next(err);
+  const status = Number(err?.status ?? err?.statusCode);
+  if (status === 404) return res.status(404).json({ error: 'not_found' });
+  if (status === 413) return res.status(413).json({ error: 'payload_too_large' });
+  if (status >= 400 && status < 500) return res.status(status).json({ error: 'bad_request' });
+  return res.status(500).json({ error: 'server_error' });
 }
 
 export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now } = {}) {
@@ -50,7 +62,10 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   const origin = `http://127.0.0.1:${port}`;
   const publicOrigin = publicHost ? `https://${publicHost}` : null;
   const limit = createRateLimiter({ now, hosted });
+  // Optional: ALLOWED_CLIENT_HOSTS="a.example,b.example" limits which client_id hosts the teaching server will fetch from.
+  const allowList = String(env.ALLOWED_CLIENT_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   const auth = createAuthServer({
+    allowedHosts: allowList.length ? new Set(allowList) : null,
     issuer: `${origin}/as`,
     // Only the lab's own origin and its /fixtures/ path are opened over http; no other private range or port.
     fetchOptions: { allowLoopback: true, loopbackOrigin: origin, loopbackPathPrefix: `${FIXTURE_PATH}/`, fetchImpl },
@@ -80,6 +95,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
 
   // Direction 2: the lab as the authorization server.
+  app.get('/as/authorize', limit('authorize', AUTHORIZE_RATE_LIMIT));
   app.use('/as', auth);
 
   app.get(`${FIXTURE_PATH}/:name.json`, (req, res) => {
@@ -122,7 +138,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     });
   });
 
-  app.post('/api/validate', express.json({ limit: '32kb' }), (req, res) => {
+  app.post('/api/validate', limit('validate'), express.json({ limit: '32kb' }), (req, res) => {
     const text = typeof req.body?.document === 'string' ? req.body.document : JSON.stringify(req.body?.document ?? null);
     if (Buffer.byteLength(text) > MAX_PASTED_BYTES) return res.status(413).json({ error: 'document_too_large' });
     let parsed;
@@ -140,7 +156,10 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
 
   // Direction 1: the lab as a client of real PingFederate.
+  const notConfigured = (res) => res.status(409).json({ error: 'pf_not_configured', detail: 'PingFederate is not configured: set PF_BASE_URL' });
+
   app.get('/api/pf/status', limit('pf-status'), async (req, res) => {
+    if (!pfSettings(env).base) return notConfigured(res);
     try {
       res.set('Cache-Control', 'no-store').json(await discoverPf({ base: pfSettings(env).base, fetchImpl }));
     } catch (error) {
@@ -150,6 +169,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
 
   app.post('/api/pf/probe', limit('pf-probe'), express.json({ limit: '4kb' }), async (req, res) => {
     const pf = pfSettings(env);
+    if (!pf.base) return notConfigured(res);
     try {
       if (req.body?.confirm !== true) return res.status(400).json({ error: 'confirm_required' });
       const preset = req.body.preset;
@@ -168,7 +188,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
 
   // Hosted state is ephemeral and shared by every visitor: Reset clears only the lab server's in-memory
   // pending requests and codes (TTL 60 s codes, 5 min pending). Nothing is persisted.
-  app.post('/api/reset', (req, res) => {
+  app.post('/api/reset', limit('reset', RESET_RATE_LIMIT), (req, res) => {
     auth.reset();
     res.json({ ok: true });
   });
@@ -178,6 +198,10 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     app.use(express.static(webDist));
     app.get(/^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)).*/, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
   }
+
+  // Last: every error is JSON, with no stack, message or path.
+  app.use((req, res) => res.status(404).json({ error: 'not_found' }));
+  app.use(jsonErrorHandler);
 
   return app;
 }
