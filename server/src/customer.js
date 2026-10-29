@@ -12,6 +12,9 @@ export const VERTICALS = ['travel', 'banking', 'healthcare'];
 // The text colours sitting on the accent fill: white in the light theme, near-black in the dark theme.
 const LIGHT_ON_ACCENT = '#ffffff';
 const DARK_ON_ACCENT = '#1a0509';
+// The dark accent also colours links and the active diagram edge on the dark surface.
+const DARK_SURFACE = '#1a212c';
+const darkOk = (hex) => contrast(hex, DARK_ON_ACCENT) >= 4.5 && contrast(hex, DARK_SURFACE) >= 4.5;
 
 export const DEFAULTS = Object.freeze({
   name: 'CIMD Lab',
@@ -71,7 +74,7 @@ export function deriveDark(hex) {
   const { h, s, l } = toHsl(hex);
   for (let step = Math.round(l * 100); step <= 95; step += 1) {
     const candidate = hslToHex(h, s, step / 100);
-    if (contrast(candidate, DARK_ON_ACCENT) >= 4.5 && !isPurple(candidate)) return candidate;
+    if (darkOk(candidate) && !isPurple(candidate)) return candidate;
   }
   return null;
 }
@@ -108,7 +111,7 @@ export function validateConfig(input) {
     const v = input.accentDark;
     if (typeof v !== 'string' || !/^#[0-9a-f]{6}$/i.test(v)) warn('accentDark', 'must be a #rrggbb colour');
     else if (isPurple(v)) warn('accentDark', 'is in the purple range (255 to 300 degrees), which this app does not use');
-    else if (contrast(v, DARK_ON_ACCENT) < 4.5) warn('accentDark', `has ${contrast(v, DARK_ON_ACCENT).toFixed(2)}:1 contrast with dark button text, needs 4.5:1`);
+    else if (!darkOk(v)) warn('accentDark', `has ${contrast(v, DARK_ON_ACCENT).toFixed(2)}:1 contrast with dark button text and ${contrast(v, DARK_SURFACE).toFixed(2)}:1 against the dark surface, needs 4.5:1 on both`);
     else out.accentDark = v.toLowerCase();
   } else if (accentOk) {
     // No dark accent given: derive one from the light accent, or keep the default dark accent.

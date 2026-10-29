@@ -4,17 +4,19 @@ import Learn from './views/Learn.jsx';
 import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
 import TalkTrack from './views/TalkTrack.jsx';
+import Stories from './views/Stories.jsx';
 
 export const TABS = [
   { id: 'learn', label: 'Learn', View: Learn },
   { id: 'pf', label: 'PingFederate as server', View: PfView },
   { id: 'lab', label: 'Lab as server', View: LabView },
+  { id: 'stories', label: 'Stories', View: Stories },
   { id: 'talk', label: 'Talk track', View: TalkTrack },
 ];
 
 export const BANNER = 'PingFederate parts use real PingFederate. The lab\'s own server is a teaching server, not a product. Tests with canned PingFederate replies prove nothing about PingFederate.';
 
-export const HOSTED_BANNER = 'Hosted copy: direction 2 is simulated by the lab\'s teaching server; direction 1 uses real PingFederate. State here is ephemeral and shared by every visitor.';
+export const HOSTED_BANNER = 'Hosted copy: direction 2 is simulated by the lab\'s teaching server; direction 1 uses real PingFederate. State here is ephemeral, lost on restart, and kept per visitor: Reset clears only yours.';
 
 function readStored(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStored(key, value) { try { localStorage.setItem(key, value); } catch { /* storage may be blocked */ } }
@@ -26,13 +28,31 @@ export default function App() {
   const [resetKey, setResetKey] = useState(0);
   const [resetNote, setResetNote] = useState('');
   const [hosted, setHosted] = useState(false);
+  const [customer, setCustomer] = useState({ name: 'CIMD Lab', tagline: '' });
+  const [vertical, setVertical] = useState(null);
   const tabRefs = useRef({});
 
   useEffect(() => {
     let live = true;
-    api.config().then((r) => { if (live && r.ok && r.data?.mode === 'hosted') setHosted(true); });
+    api.config().then((r) => {
+      if (!live || !r.ok) return;
+      if (r.data?.mode === 'hosted') setHosted(true);
+      const c = r.data?.customer;
+      if (c && typeof c.name === 'string') setCustomer(c);
+      if (typeof c?.vertical === 'string') setVertical((v) => v ?? c.vertical);
+    });
     return () => { live = false; };
   }, []);
+
+  // Branding from the server's validated customer config. Only a #rrggbb value is ever set as a colour.
+  useEffect(() => {
+    const root = document.documentElement.style;
+    const hex = /^#[0-9a-f]{6}$/i;
+    const apply = (name, value) => { if (typeof value === 'string' && hex.test(value)) root.setProperty(name, value); else root.removeProperty(name); };
+    apply('--cust-accent', customer.accent);
+    apply('--cust-accent-dark', customer.accentDark);
+    if (customer.name) document.title = customer.name;
+  }, [customer]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -61,7 +81,7 @@ export default function App() {
     <div className={`app${presenter ? ' presenter' : ''}`}>
       <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER}</div>
       <header className="bar">
-        <h1>CIMD Lab</h1>
+        <h1>{customer.name}</h1>
         <span className="mode" data-testid="mode">Mode: real PingFederate (direction 1) and the lab's teaching server (direction 2)</span>
         {!presenter && (
           <div className="actions">
@@ -70,6 +90,7 @@ export default function App() {
           </div>
         )}
         <button type="button" aria-pressed={presenter} className={presenter ? 'on' : ''} onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
+        {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
       </header>
       {!presenter && (
         <nav className="tabs" role="tablist" aria-label="Views" onKeyDown={onTabKeyDown}>
@@ -98,7 +119,7 @@ export default function App() {
       )}
       <p className="sr-only" role="status">{resetNote}</p>
       <main id="tabpanel" {...(presenter ? {} : { role: 'tabpanel', 'aria-labelledby': `tab-${tab}` })}>
-        <Active resetKey={resetKey} presenter={presenter} />
+        <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} />
       </main>
     </div>
   );

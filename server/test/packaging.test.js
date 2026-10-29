@@ -212,3 +212,9 @@ test('doctor with PF_BASE_URL unset says so plainly and contacts no PingFederate
   assert.match(result.stdout, /PingFederate is not configured: set PF_BASE_URL/);
   assert.doesNotMatch(result.stdout, /PingFederate discovery answered|did not answer|PF_BASE_URL is /);
 });
+
+test('Dockerfile ships the stories and the customer config the server reads at runtime', () => {
+  const dockerfile = read('Dockerfile');
+  assert.match(dockerfile, /^COPY stories stories$/m);
+  assert.match(dockerfile, /^COPY customer\.config\.json \.\/$/m);
+});

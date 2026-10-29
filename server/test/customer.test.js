@@ -92,7 +92,7 @@ test('low-contrast accents are refused with the measured ratio', () => {
   assert.match(light.warnings.join(' '), /accent: has \d\.\d\d:1 contrast with white button text, needs 4\.5:1/);
   assert.equal(light.config.accent, DEFAULTS.accent);
   const dark = validateConfig({ accent: '#0b6b6b', accentDark: '#1f3d2a' });
-  assert.match(dark.warnings.join(' '), /accentDark: has \d\.\d\d:1 contrast with dark button text/);
+  assert.match(dark.warnings.join(' '), /accentDark: has \d\.\d\d:1 contrast with dark button text and \d\.\d\d:1 against the dark surface/);
   assert.ok(contrast(dark.config.accentDark, '#1a0509') >= 4.5, 'a refused dark accent is replaced by a readable one');
   assert.equal(validateConfig({ accent: '#767676' }).config.accent, '#767676', '4.5:1 exactly-ish grey passes');
   assert.match(warns({ accent: '#777777' }) + warns({ accent: '#808080' }), /contrast/);

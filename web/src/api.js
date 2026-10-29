@@ -19,5 +19,7 @@ export const api = {
   pfProbe: (preset) => call('POST', '/api/pf/probe', { preset, confirm: true }),
   validate: (document) => call('POST', '/api/validate', { document }),
   tester: () => call('POST', '/api/tester/run'),
+  stories: () => call('GET', '/api/stories'),
+  story: (vertical) => call('GET', `/api/stories/${encodeURIComponent(vertical)}`),
   reset: () => call('POST', '/api/reset'),
 };
