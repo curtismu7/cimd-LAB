@@ -1,0 +1,4 @@
+cimd-lab ports the validation rules of client.dev (https://github.com/stytchauth/client.dev),
+MIT License, Copyright (c) Stytch. The rules are re-implemented in server/src/validate.js with
+additions (shared-secret refusal, PingFederate's fetch size limit, a working client_uri host check).
+The MIT licence text from that project applies to the ported rules.
