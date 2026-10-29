@@ -8,7 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export const DEFAULT_CONFIG_PATH = path.join(ROOT, 'customer.config.json');
 const MAX_FILE_BYTES = 8 * 1024;
 
-export const VERTICALS = ['travel', 'banking', 'healthcare'];
+export const VERTICALS = ['travel', 'banking', 'healthcare', 'airline'];
 // The text colours sitting on the accent fill: white in the light theme, near-black in the dark theme.
 const LIGHT_ON_ACCENT = '#ffffff';
 const DARK_ON_ACCENT = '#1a0509';

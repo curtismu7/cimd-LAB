@@ -20,8 +20,8 @@ function textsOf(common, pack) {
   return out;
 }
 
-test('three vertical packs exist, each with a cast and a story for every beat', () => {
-  assert.deepEqual(VERTICALS, ['travel', 'banking', 'healthcare']);
+test('four vertical packs exist, each with a cast and a story for every beat', () => {
+  assert.deepEqual(VERTICALS, ['travel', 'banking', 'healthcare', 'airline']);
   for (const id of VERTICALS) {
     const pack = STORIES.packs[id];
     assert.equal(pack.id, id);
@@ -114,4 +114,26 @@ test('API: list, render per vertical, unknown vertical is 404, customer cast is 
       assert.deepEqual(await r.json(), { error: 'unknown_vertical' });
     }
   } finally { await lab.close(); fs.rmSync(path.dirname(file), { recursive: true, force: true }); }
+});
+
+test('airline pack: its own fictional cast, all nine beats, no raw tokens, a different story from travel', () => {
+  const airline = renderStory('airline');
+  assert.equal(airline.label, 'Airline');
+  assert.equal(airline.cast.company, 'Aurelia Airways');
+  assert.match(airline.cast.clientUrl, /^https:\/\/[a-z0-9.-]+\.example\//);
+  assert.equal(airline.beats.length, 9);
+  for (const beat of airline.beats) {
+    assert.ok(beat.story.length > 60, beat.id);
+    assert.doesNotMatch(`${beat.title} ${beat.story} ${beat.points.join(' ')}`, /\{\{|\}\}/, beat.id);
+  }
+  const travel = renderStory('travel');
+  assert.notEqual(airline.beats[0].story, travel.beats[0].story);
+  assert.notEqual(airline.cast.company, travel.cast.company);
+  // The customer's own cast still overrides the pack's.
+  assert.match(renderStory('airline', { ...DEFAULTS, cast: { company: 'Custom Air' } }).beats[0].story, /Custom Air/);
+});
+
+test('airline is a valid customer vertical and an unregistered pack is refused', () => {
+  assert.equal(validateConfig({ vertical: 'airline' }).config.vertical, 'airline');
+  assert.throws(() => renderStory('airlines'), StoryError);
 });

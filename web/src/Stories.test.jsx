@@ -17,7 +17,7 @@ beforeEach(() => {
   document.documentElement.removeAttribute('style');
   vi.stubGlobal('fetch', vi.fn(async (url) => {
     if (url === '/api/config') return json({ mode, customer });
-    if (url === '/api/stories') return json({ verticals: [{ id: 'travel', label: 'Travel' }, { id: 'banking', label: 'Banking' }, { id: 'healthcare', label: 'Healthcare' }], default: 'banking' });
+    if (url === '/api/stories') return json({ verticals: [{ id: 'travel', label: 'Travel' }, { id: 'banking', label: 'Banking' }, { id: 'healthcare', label: 'Healthcare' }, { id: 'airline', label: 'Airline' }], default: 'banking' });
     const m = /^\/api\/stories\/(\w+)$/.exec(url);
     if (m) return m[1] === 'nope' ? json({ error: 'unknown_vertical' }, 404) : json(story(m[1], m[1][0].toUpperCase() + m[1].slice(1)));
     return json({ ok: true });
@@ -69,6 +69,9 @@ describe('Stories and Talk track share one source', () => {
     await user.click(screen.getByRole('radio', { name: 'Healthcare' }));
     expect(await screen.findByText(/Healthcare story/)).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/stories/healthcare', expect.objectContaining({ method: 'GET' }));
+    await user.click(screen.getByRole('radio', { name: 'Airline' }));
+    expect(await screen.findByText(/Airline story/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith('/api/stories/airline', expect.objectContaining({ method: 'GET' }));
   });
 
   it('the vertical picker is keyboard operable', async () => {
@@ -98,5 +101,13 @@ describe('Stories and Talk track share one source', () => {
     render(<App />);
     await user.click(screen.getByRole('tab', { name: 'Talk track' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be loaded/);
+  });
+});
+
+describe('long URLs in story text', () => {
+  it('the tab panel may break them, so a phone does not scroll sideways', async () => {
+    const fs = await import('node:fs');
+    const css = fs.readFileSync(new URL('./app.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\[role=tabpanel\]\s*\{[^}]*overflow-wrap:\s*anywhere/);
   });
 });

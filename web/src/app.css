@@ -107,6 +107,8 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border);
 .tagline { color: var(--muted); margin: 0; flex: 1 1 100%; font-size: 0.95em; }
 .story-pick { margin: 8px 0 16px; }
 .story-pick legend { font-weight: 600; padding: 0 4px; }
+/* Story text carries long unbreakable client URLs; without this they push the page wider than a phone (375px). */
+[role=tabpanel] { overflow-wrap: anywhere; }
 .story-beat { margin: 16px 0; }
 .story-beat h3 { margin: 0 0 4px; }
 .story-beat p { margin: 0; max-width: 70ch; }
