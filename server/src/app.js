@@ -52,8 +52,8 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   const limit = createRateLimiter({ now, hosted });
   const auth = createAuthServer({
     issuer: `${origin}/as`,
-    // The lab serves its own fixtures over http on 127.0.0.1; no other private range is opened.
-    fetchOptions: { allowLoopback: true, fetchImpl },
+    // Only the lab's own origin and its /fixtures/ path are opened over http; no other private range or port.
+    fetchOptions: { allowLoopback: true, loopbackOrigin: origin, loopbackPathPrefix: `${FIXTURE_PATH}/`, fetchImpl },
   });
 
   app.get('/api/health', (req, res) => {
