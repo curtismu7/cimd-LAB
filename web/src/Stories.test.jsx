@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fs from 'node:fs';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { HOSTED_BANNER } from './App.jsx';
@@ -105,9 +106,10 @@ describe('Stories and Talk track share one source', () => {
 });
 
 describe('long URLs in story text', () => {
-  it('the tab panel may break them, so a phone does not scroll sideways', async () => {
-    const fs = await import('node:fs');
-    const css = fs.readFileSync(new URL('./app.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/\[role=tabpanel\]\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  it('the tab panel may break them, so a phone does not scroll sideways', () => {
+    // vitest runs from the web package (npm -w web test) or the repo root; read the stylesheet from whichever exists.
+    const file = ['src/app.css', 'web/src/app.css'].find((f) => fs.existsSync(f));
+    expect(file).toBeTruthy();
+    expect(fs.readFileSync(file, 'utf8')).toMatch(/\[role=tabpanel\]\s*\{[^}]*overflow-wrap:\s*anywhere/);
   });
 });
