@@ -18,6 +18,7 @@
 
 ```
 npm install
+cp .env.example .env   # then set PF_BASE_URL
 npm start            # http://127.0.0.1:5250 (loopback only)
 npm test             # node --test, Node 20 and 22
 ```

@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["server"],
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
     "test": "npm test -w server",
-    "start": "node server/src/index.js"
+    "start": "node --env-file=.env server/src/index.js"
   }
 }
