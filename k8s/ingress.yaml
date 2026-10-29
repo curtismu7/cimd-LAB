@@ -1,0 +1,21 @@
+# Public, no secrets, rate limited at the edge too (the app also limits its three outbound-capable routes in hosted mode).
+# The ingress class and TLS secret are the SE cluster owner's choice: UNVERIFIED here, so neither is named (cluster default class,
+# default certificate). The ingress must pass the original Host through: the app only accepts PUBLIC_HOST and loopback.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cimd-lab
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    nginx.ingress.kubernetes.io/limit-connections: "30"
+    nginx.ingress.kubernetes.io/proxy-body-size: "16k"
+spec:
+  tls:
+    - hosts: [__SE_HOST__]
+  rules:
+    - host: __SE_HOST__
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: cimd-lab, port: { name: http } } } }

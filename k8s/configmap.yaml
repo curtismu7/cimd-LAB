@@ -1,0 +1,8 @@
+# The one outside address direction 1 contacts. Rendered by scripts/deploy-se.sh from PF_BASE_URL. No secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cimd-lab
+  labels: { app: cimd-lab }
+data:
+  PF_BASE_URL: "__PF_BASE_URL__"
