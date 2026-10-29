@@ -5,7 +5,7 @@ import { fetchDocument, FetchRefused } from './ssrf.js';
 
 const CODE_TTL_MS = 60_000;
 const PENDING_TTL_MS = 5 * 60_000;
-const MAX_STORE = 500;
+const MAX_STORE = 50; // per workspace, for each of pending and codes
 
 const token = (bytes = 24) => crypto.randomBytes(bytes).toString('base64url');
 const s256 = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -32,10 +32,17 @@ export function createAuthServer({
   fetchOptions = {},
   allowedHosts = null,
   now = Date.now,
+  touch = () => {},
 } = {}) {
   const router = express.Router();
-  const pending = new Map();
-  const codes = new Map();
+  // Per-workspace state: a request or code made in one workspace does not exist in any other.
+  const stores = new Map();
+  const storeFor = (workspaceId) => {
+    let store = stores.get(workspaceId);
+    if (!store) { store = { pending: new Map(), codes: new Map() }; stores.set(workspaceId, store); }
+    touch(workspaceId);
+    return store;
+  };
 
   router.get('/.well-known/oauth-authorization-server', (req, res) => {
     res.json({
@@ -108,6 +115,7 @@ export function createAuthServer({
   router.get('/authorize', async (req, res) => {
     try {
       const result = await evaluate(req.query);
+      const { pending } = storeFor(req.workspaceId);
       prune(pending, now);
       const id = token();
       pending.set(id, {
@@ -138,6 +146,7 @@ export function createAuthServer({
   });
 
   router.post('/approve', express.json({ limit: '4kb' }), (req, res) => {
+    const { pending, codes } = storeFor(req.workspaceId);
     prune(pending, now);
     const entry = pending.get(req.body?.pending);
     if (!entry) return res.status(400).json({ error: 'invalid_request', error_description: 'Unknown or expired request' });
@@ -156,6 +165,7 @@ export function createAuthServer({
 
   router.post('/token', express.urlencoded({ extended: false, limit: '4kb' }), express.json({ limit: '4kb' }), (req, res) => {
     res.set('Cache-Control', 'no-store');
+    const { codes } = storeFor(req.workspaceId);
     const body = req.body ?? {};
     const entry = codes.get(body.code);
     codes.delete(body.code);
@@ -170,10 +180,8 @@ export function createAuthServer({
     });
   });
 
-  router.reset = () => {
-    pending.clear();
-    codes.clear();
-  };
+  router.reset = (workspaceId) => { stores.delete(workspaceId); };
+  router.drop = (workspaceId) => { stores.delete(workspaceId); };
 
   return router;
 }

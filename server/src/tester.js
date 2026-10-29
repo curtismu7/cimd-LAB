@@ -76,12 +76,12 @@ export function buildCases({ fixtureBase }) {
   ];
 }
 
-export async function runServerTests({ asBase, fixtureBase, fetchImpl = fetch }) {
+export async function runServerTests({ asBase, fixtureBase, fetchImpl = fetch, headers = {} }) {
   assertLoopback(asBase);
   const results = [];
   const call = async (method, url, init = {}) => {
     const tp = traceparent();
-    const response = await fetchImpl(url, { ...init, method, headers: { traceparent: tp, ...(init.headers ?? {}) } });
+    const response = await fetchImpl(url, { ...init, method, headers: { traceparent: tp, ...headers, ...(init.headers ?? {}) } });
     const text = await response.text();
     let body;
     try { body = JSON.parse(text); } catch { body = text; }

@@ -6,6 +6,7 @@ import { createAuthServer } from './authserver.js';
 import { FIXTURES, FIXTURE_PATH } from './fixtures.js';
 import { validateCimdDocument } from './validate.js';
 import { runServerTests } from './tester.js';
+import { createWorkspaces } from './workspace.js';
 import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
@@ -64,7 +65,10 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   const limit = createRateLimiter({ now, hosted });
   // Optional: ALLOWED_CLIENT_HOSTS="a.example,b.example" limits which client_id hosts the teaching server will fetch from.
   const allowList = String(env.ALLOWED_CLIENT_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
-  const auth = createAuthServer({
+  let auth;
+  const workspaces = createWorkspaces({ hosted, local: env.WORKSPACE, now, onEvict: (id) => auth.drop(id) });
+  auth = createAuthServer({
+    touch: workspaces.touch,
     allowedHosts: allowList.length ? new Set(allowList) : null,
     issuer: `${origin}/as`,
     // Only the lab's own origin and its /fixtures/ path are opened over http; no other private range or port.
@@ -93,6 +97,9 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     if (sent && sent !== origin && sent !== `http://localhost:${port}` && sent !== publicOrigin) return res.status(403).json({ error: 'cross-origin write refused' });
     next();
   });
+
+  // Every request below belongs to one workspace (see workspace.js).
+  app.use(workspaces.middleware);
 
   // Direction 2: the lab as the authorization server.
   app.get('/as/authorize', limit('authorize', AUTHORIZE_RATE_LIMIT));
@@ -148,10 +155,15 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
 
   // Direction 2 tester: probe the lab's own authorization server.
   app.post('/api/tester/run', limit('tester'), async (req, res) => {
+    // The tester calls /as over loopback without a cookie, so it presents a one-run token that maps to this caller's workspace.
+    let run;
     try {
-      res.set('Cache-Control', 'no-store').json(await runServerTests({ asBase: `${origin}/as`, fixtureBase: origin, fetchImpl }));
+      run = workspaces.grantInternal(req.workspaceId);
+      res.set('Cache-Control', 'no-store').json(await runServerTests({ asBase: `${origin}/as`, fixtureBase: origin, fetchImpl, headers: { 'x-cimd-internal': run.grant } }));
     } catch {
       res.status(500).json({ error: 'tester_failed' });
+    } finally {
+      run?.revoke();
     }
   });
 
@@ -186,10 +198,10 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     }
   });
 
-  // Hosted state is ephemeral and shared by every visitor: Reset clears only the lab server's in-memory
-  // pending requests and codes (TTL 60 s codes, 5 min pending). Nothing is persisted.
+  // State is ephemeral and per workspace: Reset clears only the caller's in-memory pending requests and codes
+  // (TTL 60 s codes, 5 min pending). Nothing is persisted.
   app.post('/api/reset', limit('reset', RESET_RATE_LIMIT), (req, res) => {
-    auth.reset();
+    auth.reset(req.workspaceId);
     res.json({ ok: true });
   });
 
