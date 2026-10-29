@@ -112,3 +112,24 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border);
 .story-beat { margin: 16px 0; }
 .story-beat h3 { margin: 0 0 4px; }
 .story-beat p { margin: 0; max-width: 70ch; }
+
+/* Learn: the expanded registration problem and the DCR versus CIMD comparison. Stacks on a phone. */
+.problem { padding-left: 1.2em; }
+.problem li { margin: 0 0 16px; }
+.problem h4 { margin: 0 0 4px; }
+.problem p { margin: 0; max-width: 70ch; }
+.src { margin: 4px 0 0; color: var(--muted); font-size: 0.85em; }
+.src-label { text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8em; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; margin-right: 4px; }
+.cmp { display: grid; gap: 12px; }
+.cmp-row { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+.cmp-row h4 { margin: 0 0 8px; }
+.cmp-cols { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 640px) { .cmp-cols { grid-template-columns: 1fr 1fr; gap: 24px; } }
+.cmp-cols p { margin: 4px 0 0; }
+.cmp-tag { display: inline-block; font-weight: 700; font-size: 0.8em; letter-spacing: 0.04em; padding: 1px 8px; border-radius: 4px; border: 1px solid var(--control-border); color: var(--text); }
+.cmp-tag-cimd { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.calc-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 8px 0 12px; }
+.calc-field { display: grid; gap: 4px; font-weight: 600; }
+.calc-field input { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 8px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.calc-out h4 { margin: 0 0 4px; }
+.calc-out p { margin: 0; }
