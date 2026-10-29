@@ -150,20 +150,29 @@ test('the hosted deployment names no secret and the repo carries no hosts other 
   // Test files carry hostile fixtures (private and metadata addresses) on purpose, so only shipped files are scanned.
   const skip = new Set(['node_modules', '.git', 'dist', 'test']);
   const hosts = new Set();
+  const where = new Map();
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       if (skip.has(e.name)) continue;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
       else if (/\.(js|jsx|json|md|ya?ml|sh|mjs|html)$/.test(e.name) && e.name !== 'package-lock.json' && !/\.test\./.test(e.name)) {
-        for (const m of fs.readFileSync(p, 'utf8').matchAll(/https?:\/\/([a-z0-9][a-z0-9.-]*)/gi)) hosts.add(m[1].toLowerCase());
+        for (const m of fs.readFileSync(p, 'utf8').matchAll(/https?:\/\/([a-z0-9][a-z0-9.-]*)/gi)) {
+          const h = m[1].toLowerCase();
+          hosts.add(h);
+          where.set(h, [...(where.get(h) ?? []), path.relative(root, p)]);
+        }
       }
     }
   };
   walk(root);
   // IP literals are the tester's deliberate private-address cases; 'user' is the userinfo part of its credentials-in-URL case.
   const allowed = (h) => /^[0-9.]+$/.test(h) || h === 'user' || h === 'client.dev' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.example') || h.endsWith('.invalid');
-  assert.deepEqual([...hosts].filter((h) => !allowed(h)).sort(), []);
+  // This app's own hosted address may be recorded in the two documents that must name it (README and the shelf entry), never in code.
+  const OWN_HOST = 'cimd-lab.ai-demo.ping-devops.com';
+  const OWN_DOCS = new Set(['README.md', 'docs/shelf-entry.json']);
+  const ownOk = (h) => h === OWN_HOST && where.get(h).every((f) => OWN_DOCS.has(f));
+  assert.deepEqual([...hosts].filter((h) => !allowed(h) && !ownOk(h)).sort(), []);
 });
 
 test('content pack and shelf entry are well formed and portable', () => {
