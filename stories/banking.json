@@ -1,0 +1,24 @@
+{
+  "schema": "cimd-lab-stories/1",
+  "id": "banking",
+  "label": "Banking",
+  "cast": {
+    "company": "Harbor & Pine Bank",
+    "user": "Priya",
+    "assistant": "Ledgerly",
+    "client": "Ledgerly Assistant",
+    "clientUrl": "https://ledgerly.harborpine.example/oauth/client.json",
+    "resource": "Harbor and Pine accounts API"
+  },
+  "stories": {
+    "registration-problem": "{{cast.user}} wants {{cast.assistant}} to read her statements. The {{cast.resource}} has no record of {{cast.assistant}}, and {{cast.company}}'s security team does not want a ticket queue for every new assistant.",
+    "idea": "{{cast.assistant}} serves a JSON file at {{cast.clientUrl}} and uses that address as its id. The bank's server reads the file when the request arrives.",
+    "document": "The file at {{cast.clientUrl}} names {{cast.client}}, lists its callback, and holds no secret: a secret in a public file is a published secret.",
+    "strict": "The bank's server treats the address as hostile input. Https only, no private ranges, no redirects, a size cap, and the id inside the file must equal the address it came from.",
+    "direction1": "The lab acts as {{cast.client}} and PingFederate acts as {{cast.company}}'s authorization server. Real PingFederate only; whether it supports URL client ids is unverified and the lab says so.",
+    "probe": "{{cast.client}}'s address goes to PingFederate. Moving on to sign-in means the file was fetched and accepted; an HTTP 400 means there is no enabled policy for that address.",
+    "direction2": "The lab becomes the bank's teaching sign-in server. {{cast.user}} approves a request for {{cast.client}} on a consent screen built from the fetched file, and the token that follows is clearly labelled as the lab's.",
+    "refusals": "A forged {{cast.client}} file with the wrong id, a published secret, a huge body or a redirect is refused at a named check, and a code used twice fails the second time.",
+    "close": "For {{cast.company}}, CIMD means no pre-registration queue, and the bank's care moves into how the server fetches and checks files. Reset clears the lab."
+  }
+}

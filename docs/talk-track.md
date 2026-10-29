@@ -1,8 +1,8 @@
 # CIMD Lab talk track
 
-Nine short beats. Each is also a presenter note. Use the arrow keys in presenter mode to step the diagram on screen.
+Nine short beats. Each is also a presenter note. Use the arrow keys in presenter mode to step the diagram on screen. The story under each beat is told about Meridian Journeys and its assistant, Wanderly; pick another vertical on the Stories tab to retell it.
 
-On the hosted copy (the banner says so), say it plainly: direction 2 is simulated by the lab's teaching server, direction 1 uses real PingFederate, and state is ephemeral and shared by everyone watching, so Reset affects them too.
+On the hosted copy (the banner says so), say it plainly: direction 2 is simulated by the lab's teaching server, direction 1 uses real PingFederate, and state is ephemeral, lost on restart, and kept per visitor, so Reset clears only your own workspace.
 
 ## 1. The registration problem
 - A client that wants to use an authorization server has to register with it first.
@@ -10,7 +10,7 @@ On the hosted copy (the banner says so), say it plainly: direction 2 is simulate
 
 ## 2. The idea
 - Let the client's id be an https URL.
-- The server fetches the JSON document behind the URL and reads the client's settings from it.
+- The authorization server fetches the JSON document behind the URL and reads the client's settings from it.
 - Show the Learn tab, DCR versus CIMD diagram, and press Simulate.
 
 ## 3. What is in the document
@@ -18,11 +18,11 @@ On the hosted copy (the banner says so), say it plainly: direction 2 is simulate
 - Point at the field list on the Learn tab.
 
 ## 4. Why the server is strict
-- A stranger chooses the URL, so the server must bound what it fetches.
+- A stranger chooses the URL, so the authorization server must bound what it fetches.
 - Walk the rules list: https, URL equals source, listed redirect addresses, no secrets, no private addresses.
 
 ## 5. Direction 1: PingFederate as the server
-- Open the PingFederate as server tab. The lab is the client, PingFederate is the server.
+- Open the PingFederate as server tab. The lab is the client, PingFederate is the authorization server.
 - This part uses real PingFederate. There is no mock of it.
 - Say plainly: whether PingFederate can act as a CIMD client is not verified, and the lab does not claim it.
 
@@ -42,4 +42,4 @@ On the hosted copy (the banner says so), say it plainly: direction 2 is simulate
 
 ## 9. Close
 - CIMD removes the registration step but moves trust to the document and to the server's fetch rules.
-- Press Reset to clear the lab and restore the diagrams, ready for the next audience.
+- Press Reset to clear your workspace on the lab and restore the diagrams, ready for the next audience.

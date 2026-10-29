@@ -7,6 +7,8 @@ import { FIXTURES, FIXTURE_PATH } from './fixtures.js';
 import { validateCimdDocument } from './validate.js';
 import { runServerTests } from './tester.js';
 import { createWorkspaces } from './workspace.js';
+import { loadCustomerConfig, publicConfig } from './customer.js';
+import { renderStory, verticalList, StoryError } from './stories.js';
 import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
@@ -52,8 +54,10 @@ export function jsonErrorHandler(err, req, res, next) {
   return res.status(500).json({ error: 'server_error' });
 }
 
-export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now } = {}) {
+export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile } = {}) {
   const app = express();
+  // customer.config.json (or CUSTOMER_CONFIG): validated once at start; bad fields fall back and are reported.
+  const customer = loadCustomerConfig({ file: customerFile, env });
   app.disable('x-powered-by');
   const hosted = env.MODE === 'hosted';
   const publicHost = hosted ? (env.PUBLIC_HOST || '') : '';
@@ -141,8 +145,19 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
       ownClientIdConfigured: Boolean(pf.ownClientId),
       clientDev: CLIENT_DEV,
       issuer: `${origin}/as`,
+      customer: publicConfig(customer),
       fixtures: Object.entries(FIXTURES).map(([name, fixture]) => ({ name, title: fixture.title, rule: fixture.rule })),
     });
+  });
+
+  app.get('/api/stories', (req, res) => res.json({ verticals: verticalList(), default: customer.config.vertical }));
+  app.get('/api/stories/:vertical', (req, res) => {
+    try {
+      res.json(renderStory(req.params.vertical, customer.config));
+    } catch (error) {
+      if (error instanceof StoryError && error.message === 'unknown vertical') return res.status(404).json({ error: 'unknown_vertical' });
+      return res.status(500).json({ error: 'story_failed' });
+    }
   });
 
   app.post('/api/validate', limit('validate'), express.json({ limit: '32kb' }), (req, res) => {

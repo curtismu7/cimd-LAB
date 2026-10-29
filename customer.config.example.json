@@ -1,0 +1,16 @@
+{
+  "name": "Northern Lights Desk",
+  "tagline": "How our assistant gets into partner systems without pre-registration",
+  "accent": "#0b6b6b",
+  "vertical": "banking",
+  "vocabulary": {
+    "client": "app",
+    "authorizationServer": "sign-in server",
+    "assistant": "digital teller"
+  },
+  "cast": {
+    "company": "Northern Lights Bank",
+    "assistant": "Aurora",
+    "clientUrl": "https://aurora.northern-lights.example/oauth/client.json"
+  }
+}

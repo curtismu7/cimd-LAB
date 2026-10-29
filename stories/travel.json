@@ -1,0 +1,24 @@
+{
+  "schema": "cimd-lab-stories/1",
+  "id": "travel",
+  "label": "Travel",
+  "cast": {
+    "company": "Meridian Journeys",
+    "user": "Maya",
+    "assistant": "Wanderly",
+    "client": "Wanderly Concierge",
+    "clientUrl": "https://wanderly.meridian-journeys.example/oauth/client.json",
+    "resource": "Meridian trip planner"
+  },
+  "stories": {
+    "registration-problem": "{{cast.user}} asks {{cast.assistant}} to rebook a flight. {{cast.assistant}} has never talked to the {{cast.resource}} before, and {{cast.company}} would rather not hand-register every assistant a customer brings along.",
+    "idea": "{{cast.assistant}} publishes one JSON file at {{cast.clientUrl}}. That address is its id. The {{cast.resource}} reads the file instead of keeping a record made in advance.",
+    "document": "The file at {{cast.clientUrl}} names {{cast.client}}, lists the one callback it will accept, and carries no secret, because anyone can read it.",
+    "strict": "{{cast.company}}'s sign-in server does not trust the address just because {{cast.assistant}} typed it. It fetches over https only, refuses private addresses, caps the size, and checks the file names itself.",
+    "direction1": "Here the lab plays {{cast.assistant}}'s side and a real PingFederate plays {{cast.company}}'s sign-in server. Whether PingFederate accepts a URL as a client id is exactly what the owner checks, and it is not claimed here.",
+    "probe": "The probe sends {{cast.client}}'s address to PingFederate. A sign-in page means it fetched and accepted the file; an HTTP 400 means no policy there matches that address.",
+    "direction2": "Now the lab plays {{cast.company}}'s sign-in server. It receives {{cast.client}}'s address from {{cast.user}}'s trip, fetches the file and shows {{cast.user}} a consent screen built from it.",
+    "refusals": "A look-alike assistant claims to be {{cast.client}} but its file names a different id, or hides a secret in the open. The server stops it at the named check, and {{cast.user}} never sees a consent screen.",
+    "close": "{{cast.company}} saves the registration step and keeps the trust where it belongs: in the file and in how strictly the server reads it. Reset clears the lab for the next audience."
+  }
+}

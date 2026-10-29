@@ -1,0 +1,24 @@
+{
+  "schema": "cimd-lab-stories/1",
+  "id": "healthcare",
+  "label": "Healthcare",
+  "cast": {
+    "company": "Cedar Valley Health",
+    "user": "Dr. Okafor",
+    "assistant": "Carewise",
+    "client": "Carewise Scribe",
+    "clientUrl": "https://carewise.cedarvalley.example/oauth/client.json",
+    "resource": "Cedar Valley patient records API"
+  },
+  "stories": {
+    "registration-problem": "{{cast.user}} wants {{cast.assistant}} to draft visit notes. The {{cast.resource}} has never heard of {{cast.assistant}}, and {{cast.company}} cannot pre-register every tool a clinician tries.",
+    "idea": "{{cast.assistant}} publishes a JSON file at {{cast.clientUrl}}; the address is its client id. The server reads the file at request time.",
+    "document": "The file at {{cast.clientUrl}} names {{cast.client}}, lists the callback it will use and carries no secret, since the file is public.",
+    "strict": "Because anyone can choose the address, {{cast.company}}'s server reads it with care: https only, no private addresses, no redirects, a size cap, and an id that matches the address.",
+    "direction1": "The lab acts as {{cast.client}} and real PingFederate as {{cast.company}}'s sign-in server. Whether PingFederate takes a URL client id is not verified, and no mock stands in for it.",
+    "probe": "The probe gives PingFederate {{cast.client}}'s address. A move to sign-in means it was accepted; HTTP 400 means no enabled policy matches the address.",
+    "direction2": "The lab is now {{cast.company}}'s teaching sign-in server. {{cast.user}} sees a consent screen built from {{cast.client}}'s file and approves; the access token is the lab's opaque teaching value.",
+    "refusals": "A tool pretending to be {{cast.client}} with a mismatched id, a secret in the file, an oversize body or a redirect is stopped at a named check; a reused code fails.",
+    "close": "{{cast.company}} avoids a registration step and relies on how strictly the server reads the file. Reset clears the lab."
+  }
+}
