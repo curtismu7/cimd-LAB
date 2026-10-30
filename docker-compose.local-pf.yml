@@ -1,0 +1,12 @@
+# Optional override: point direction 1 at a PingFederate running on this machine behind a mkcert certificate.
+#   MKCERT_CA="$(mkcert -CAROOT)/rootCA.pem" PF_BASE_URL=https://<your-local-pf-name>:9031 PF_LOCAL_HOST=<your-local-pf-name> \
+#     docker compose -f docker-compose.yml -f docker-compose.local-pf.yml up -d
+# The container resolves PF_LOCAL_HOST to the host machine and trusts the mkcert root (a public certificate, not a secret).
+services:
+  cimd-lab:
+    extra_hosts:
+      - "${PF_LOCAL_HOST:?set PF_LOCAL_HOST to the local PingFederate host name}:host-gateway"
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/mkcert-ca.pem
+    volumes:
+      - "${MKCERT_CA:?set MKCERT_CA to the path of mkcert's rootCA.pem}:/certs/mkcert-ca.pem:ro"
