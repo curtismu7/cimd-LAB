@@ -6,7 +6,7 @@
   "demo": {
     "id": "cimd-lab",
     "name": "CIMD Lab",
-    "catalog": "X0",
+    "catalog": "D36",
     "baseUrl": "http://127.0.0.1:5250",
     "doctor": "/api/health",
     "tags": ["cimd", "oauth", "pingfederate", "client-registration"]
