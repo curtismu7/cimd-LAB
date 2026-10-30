@@ -1,6 +1,7 @@
 # Local standalone. Publishes on loopback only. Direction 1 needs PF_BASE_URL, which has no default (set it in your shell or a .env next to this file).
 services:
   cimd-lab:
+    restart: unless-stopped
     build: .
     ports:
       - "127.0.0.1:5250:5250"
