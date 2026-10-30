@@ -1,12 +1,26 @@
-# Optional override: point direction 1 at a PingFederate running on this machine behind a mkcert certificate.
-#   MKCERT_CA="$(mkcert -CAROOT)/rootCA.pem" PF_BASE_URL=https://<your-local-pf-name>:9031 PF_LOCAL_HOST=<your-local-pf-name> \
+# Optional override: run direction 1 against a PingFederate on this machine behind a mkcert certificate, including the lab's
+# OWN document (PingFederate needs an https address for it, so an nginx front serves one on 127.0.0.1:5251).
+#   MKCERT_CA="$(mkcert -CAROOT)/rootCA.pem" MKCERT_CERT=<mkcert cert for PF_LOCAL_HOST> MKCERT_KEY=<its key> \
+#   PF_BASE_URL=https://<pf-host>:9031 PF_LOCAL_HOST=<pf-host> \
 #     docker compose -f docker-compose.yml -f docker-compose.local-pf.yml up -d
-# The container resolves PF_LOCAL_HOST to the host machine and trusts the mkcert root (a public certificate, not a secret).
+# The container resolves PF_LOCAL_HOST to this machine and trusts the mkcert root (a public certificate). The mkcert KEY is a
+# local development key: never commit it.
 services:
   cimd-lab:
     extra_hosts:
       - "${PF_LOCAL_HOST:?set PF_LOCAL_HOST to the local PingFederate host name}:host-gateway"
     environment:
       NODE_EXTRA_CA_CERTS: /certs/mkcert-ca.pem
+      CIMD_CLIENT_ID_URL: "https://${PF_LOCAL_HOST}:5251/client.json"
+      CIMD_REDIRECT_URI: "https://${PF_LOCAL_HOST}:5251/callback"
     volumes:
       - "${MKCERT_CA:?set MKCERT_CA to the path of mkcert's rootCA.pem}:/certs/mkcert-ca.pem:ro"
+  tls:
+    image: nginx:1.27-alpine
+    depends_on: [cimd-lab]
+    ports:
+      - "127.0.0.1:5251:5251"
+    volumes:
+      - ./nginx-local-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - "${MKCERT_CERT:?set MKCERT_CERT to a mkcert certificate for PF_LOCAL_HOST}:/certs/tls.pem:ro"
+      - "${MKCERT_KEY:?set MKCERT_KEY to that certificate's key}:/certs/tls-key.pem:ro"
