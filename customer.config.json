@@ -1,0 +1,12 @@
+{
+  "name": "CIMD Lab",
+  "tagline": "Client ID metadata documents, both directions",
+  "accent": "#b3122d",
+  "accentDark": "#ff6b7f",
+  "vertical": "travel",
+  "vocabulary": {
+    "client": "client",
+    "authorizationServer": "authorization server",
+    "assistant": "assistant"
+  }
+}

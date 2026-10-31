@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.log
+.env
+dist/
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.lic
+settings.json
+secrets.json
+*.secrets.*

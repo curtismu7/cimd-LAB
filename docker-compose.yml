@@ -1,0 +1,17 @@
+# Local standalone. Publishes on loopback only. Direction 1 needs PF_BASE_URL, which has no default (set it in your shell or a .env next to this file).
+services:
+  cimd-lab:
+    restart: unless-stopped
+    build: .
+    ports:
+      - "127.0.0.1:5250:5250"
+    environment:
+      BIND: "0.0.0.0"   # inside the container only; the Host check still accepts loopback names only
+      PORT: "5250"
+      PF_BASE_URL: "${PF_BASE_URL:-}"   # empty = direction 1 off; nothing is contacted
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true

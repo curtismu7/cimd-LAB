@@ -1,0 +1,60 @@
+# Hosted build of CIMD Lab for the SE cluster (MODE=hosted). Same image as the local standalone.
+# Direction 2 is self-contained. Direction 1 contacts only PF_BASE_URL (public discovery + one authorize GET): REAL PingFederate,
+# never a mock (owner decision 2026-10-28). No secrets, no volumes with data. Placeholders are filled by scripts/deploy-se.sh.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cimd-lab
+  labels: { app: cimd-lab }
+spec:
+  # ONE pod on purpose: authorization-server state (pending requests, codes) and rate-limit counters live in this process's memory.
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: cimd-lab }
+  template:
+    metadata:
+      labels: { app: cimd-lab }
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 5250 }
+          env:
+            - { name: MODE, value: hosted }
+            - { name: PUBLIC_HOST, value: "__SE_HOST__" }
+            - { name: PORT, value: "5250" }
+            - { name: CIMD_CLIENT_ID_URL, value: "https://__SE_HOST__/client.json" }
+            - { name: CIMD_REDIRECT_URI, value: "https://__SE_HOST__/callback" }
+            - name: PF_BASE_URL
+              valueFrom:
+                configMapKeyRef: { name: cimd-lab, key: PF_BASE_URL }
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }

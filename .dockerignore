@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+web/dist
+.git
+.github
+.env
+.env.*
+!.env.example
+docs/*
+!docs/talk-track.md
+k8s
+scripts
+test
+**/test
+*.log
