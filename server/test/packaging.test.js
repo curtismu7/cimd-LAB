@@ -118,7 +118,7 @@ test('deploy with approval applies nothing when a later file has a leftover toke
   const bin = path.join(tmp, 'bin');
   fs.mkdirSync(bin);
   const log = path.join(tmp, 'kubectl.log');
-  fs.writeFileSync(path.join(bin, 'kubectl'), `#!/bin/sh\necho "$@" >> "${log}"\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'kubectl'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\n`, { mode: 0o755 });
   const run = (scriptRoot, extra = {}) => spawnSync('bash', [path.join(scriptRoot, 'scripts/deploy-se.sh')], {
     env: { PATH: `${bin}:${process.env.PATH}`, HOME: os.tmpdir(), OWNER_APPROVED: '1', ...VALUES, ...extra }, encoding: 'utf8',
   });
