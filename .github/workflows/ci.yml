@@ -21,6 +21,12 @@ jobs:
       - run: npm run build
       - name: SE manifests render (dry run, no cluster)
         run: NAMESPACE=ci IMAGE=registry.invalid/cimd-lab:ci SE_HOST=cimd-lab.invalid PF_BASE_URL=https://pf.invalid DRY_RUN=1 scripts/deploy-se.sh > /dev/null
+  ui-standard:
+    # The vendored shared stylesheet must match its pinned hash (and the canonical copy, where it exists).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: scripts/check-ui-standard.sh
   doctor:
     # doctor needs no running server: with PF_BASE_URL unset it checks Node, the port, the web build and contacts nothing.
     runs-on: ubuntu-latest
