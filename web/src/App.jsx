@@ -21,6 +21,10 @@ export const HOSTED_BANNER = 'Hosted copy: direction 2 is simulated by the lab\'
 function readStored(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStored(key, value) { try { localStorage.setItem(key, value); } catch { /* storage may be blocked */ } }
 
+function ModeBadge({ state, label }) {
+  return <span className="mode-badge" data-testid="mode-badge" data-state={state}>{label}</span>;
+}
+
 export default function App() {
   const [tab, setTab] = useState('learn');
   const [presenter, setPresenter] = useState(false);
@@ -28,6 +32,8 @@ export default function App() {
   const [resetKey, setResetKey] = useState(0);
   const [resetNote, setResetNote] = useState('');
   const [hosted, setHosted] = useState(false);
+  const [pfConfigured, setPfConfigured] = useState(false);
+  const [systemDark, setSystemDark] = useState(() => (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   const [customer, setCustomer] = useState({ name: 'CIMD Lab', tagline: '' });
   const [vertical, setVertical] = useState(null);
   const tabRefs = useRef({});
@@ -37,6 +43,7 @@ export default function App() {
     api.config().then((r) => {
       if (!live || !r.ok) return;
       if (r.data?.mode === 'hosted') setHosted(true);
+      setPfConfigured(Boolean(r.data?.pfBase));
       const c = r.data?.customer;
       if (c && typeof c.name === 'string') setCustomer(c);
       if (typeof c?.vertical === 'string') setVertical((v) => v ?? c.vertical);
@@ -44,15 +51,27 @@ export default function App() {
     return () => { live = false; };
   }, []);
 
-  // Branding from the server's validated customer config. Only a #rrggbb value is ever set as a colour.
   useEffect(() => {
-    const root = document.documentElement.style;
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (event) => setSystemDark(event.matches);
+    query.addEventListener?.('change', onChange);
+    return () => query.removeEventListener?.('change', onChange);
+  }, []);
+
+  // Branding from the server's validated customer config. Only a #rrggbb value is ever set as a colour, as the
+  // --accent custom property (the dark accent when the dark theme is showing). The shared stylesheet does the rest.
+  const dark = theme === 'dark' || (theme === 'auto' && systemDark);
+  useEffect(() => {
+    const root = document.documentElement;
     const hex = /^#[0-9a-f]{6}$/i;
-    const apply = (name, value) => { if (typeof value === 'string' && hex.test(value)) root.setProperty(name, value); else root.removeProperty(name); };
-    apply('--cust-accent', customer.accent);
-    apply('--cust-accent-dark', customer.accentDark);
+    const value = dark ? customer.accentDark : customer.accent;
+    const valid = typeof value === 'string' && hex.test(value);
+    if (valid) root.style.setProperty('--accent', value); else root.style.removeProperty('--accent');
+    // Dark text on the (lighter) dark accent; it was validated at 4.5:1 by the server.
+    if (valid && dark) root.setAttribute('data-accent', 'dark'); else root.removeAttribute('data-accent');
     if (customer.name) document.title = customer.name;
-  }, [customer]);
+  }, [customer, dark]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -79,10 +98,14 @@ export default function App() {
 
   return (
     <div className={`app${presenter ? ' presenter' : ''}`}>
-      <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER}</div>
+      <div className="banner" role="note" data-testid="banner" data-state={tab === 'pf' && pfConfigured ? 'live' : 'offline'}>{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER}</div>
       <header className="bar">
         <h1>{customer.name}</h1>
-        <span className="mode" data-testid="mode">Mode: real PingFederate (direction 1) and the lab's teaching server (direction 2)</span>
+        <span className="mode" data-testid="mode">
+          {tab !== 'lab' && <ModeBadge state={pfConfigured ? 'live' : 'off'} label={pfConfigured ? 'Live' : 'Live: not configured'} />}
+          {tab !== 'pf' && <ModeBadge state="offline" label="Offline simulation" />}
+          {{ pf: 'Direction 1: real PingFederate', lab: 'Direction 2: the lab\'s teaching server, in-process' }[tab] ?? 'Direction 1 is real PingFederate, direction 2 is the lab\'s teaching server'}
+        </span>
         {!presenter && (
           <div className="actions">
             <button type="button" onClick={reset}>Reset</button>
