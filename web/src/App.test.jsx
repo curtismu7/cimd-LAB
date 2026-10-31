@@ -106,6 +106,25 @@ describe('tablist follows the ARIA tab pattern', () => {
 describe('hosted banner variant', () => {
   const configAs = (mode) => vi.stubGlobal('fetch', vi.fn(async (url) => (url === '/api/config' ? json({ mode, publicHost: 'cimd-lab.example', pfBase: 'https://pf.example:9031' }) : json({ ok: true }))));
 
+  it('shows an honest mode badge per direction', async () => {
+    const user = userEvent.setup();
+    configAs('local');
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByTestId('mode-badge').map((b) => b.textContent)).toEqual(['Live', 'Offline simulation']));
+    await user.click(screen.getByRole('tab', { name: 'PingFederate as server' }));
+    expect(screen.getAllByTestId('mode-badge').map((b) => [b.textContent, b.dataset.state])).toEqual([['Live', 'live']]);
+    expect(screen.getByTestId('banner').dataset.state).toBe('live');
+    await user.click(screen.getByRole('tab', { name: 'Lab as server' }));
+    expect(screen.getAllByTestId('mode-badge').map((b) => [b.textContent, b.dataset.state])).toEqual([['Offline simulation', 'offline']]);
+    expect(screen.getByTestId('banner').dataset.state).toBe('offline');
+  });
+
+  it('says Live is not configured when PF_BASE_URL is unset', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => (url === '/api/config' ? json({ mode: 'local' }) : json({ ok: true }))));
+    render(<App />);
+    expect(await screen.findByText('Live: not configured')).toBeInTheDocument();
+  });
+
   it('shows the hosted text in addition to the usual banner, also in presenter mode', async () => {
     configAs('hosted');
     const user = userEvent.setup();

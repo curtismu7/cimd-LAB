@@ -32,16 +32,27 @@ describe('customer branding', () => {
     expect(screen.getByText('Our tagline <i>x</i>')).toBeInTheDocument();
     expect(document.querySelector('.tagline i')).toBeNull();
     const root = document.documentElement.style;
-    await waitFor(() => expect(root.getPropertyValue('--cust-accent')).toBe('#0b6b6b'));
-    expect(root.getPropertyValue('--cust-accent-dark')).toBe('#0e8b8b');
+    await waitFor(() => expect(root.getPropertyValue('--accent')).toBe('#0b6b6b'));
+    expect(document.documentElement.hasAttribute('data-accent')).toBe(false);
     expect(document.title).toBe('Acme Desk');
+  });
+
+  it('uses the dark accent, with dark text on it, when the dark theme is picked', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const root = document.documentElement;
+    await screen.findByRole('heading', { level: 1, name: 'Acme Desk' });
+    await user.click(screen.getByRole('button', { name: /^Theme: auto/ }));
+    await user.click(screen.getByRole('button', { name: /^Theme: light/ }));
+    await waitFor(() => expect(root.style.getPropertyValue('--accent')).toBe('#0e8b8b'));
+    expect(root.getAttribute('data-accent')).toBe('dark');
   });
 
   it('ignores a colour that is not #rrggbb', async () => {
     customer.accent = 'red; background:url(x)';
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Acme Desk' });
-    expect(document.documentElement.style.getPropertyValue('--cust-accent')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('');
   });
 
   it('falls back to the default name when the server gives no customer', async () => {
