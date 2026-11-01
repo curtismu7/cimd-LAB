@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import net from 'node:net';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -222,4 +223,88 @@ test('Dockerfile ships the stories and the customer config the server reads at r
   const dockerfile = read('Dockerfile');
   assert.match(dockerfile, /^COPY stories stories$/m);
   assert.match(dockerfile, /^COPY customer\.config\.json \.\/$/m);
+});
+
+// S4: the README says .env is optional ("With no setup at all ... tabs work offline"), so `npm start` must not need one.
+function freePort() {
+  return new Promise((resolve) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
+}
+function runStartScript(extraFiles = {}) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cimd-start-'));
+  fs.cpSync(path.join(root, 'server'), path.join(tmp, 'server'), { recursive: true, filter: (src) => !src.includes('node_modules') });
+  fs.cpSync(path.join(root, 'stories'), path.join(tmp, 'stories'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'customer.config.json'), path.join(tmp, 'customer.config.json'));
+  fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'));
+  for (const [name, text] of Object.entries(extraFiles)) fs.writeFileSync(path.join(tmp, name), text);
+  return tmp;
+}
+async function startAndAsk(tmp, script) {
+  const port = await freePort();
+  // the script exactly as package.json writes it, in a folder that has (or lacks) a .env
+  const child = spawn('sh', ['-c', script], { cwd: tmp, env: { PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`, HOME: os.tmpdir(), PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  child.stdout.on('data', (c) => { out += c; });
+  child.stderr.on('data', (c) => { out += c; });
+  let exited = null;
+  child.once('exit', (code) => { exited = code; });
+  try {
+    for (let i = 0; i < 200 && exited === null; i += 1) {
+      try {
+        const r = await fetch(`http://127.0.0.1:${port}/api/health`);
+        return { health: await r.json(), out };
+      } catch { await new Promise((resolve) => setTimeout(resolve, 50)); }
+    }
+    return { health: null, exited, out };
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise((resolve) => { child.once('exit', resolve); setTimeout(resolve, 2000); });
+  }
+}
+
+test('S4: the start script uses --env-file-if-exists (never the strict --env-file), and README still calls .env optional', () => {
+  const { scripts } = JSON.parse(read('package.json'));
+  assert.match(scripts.start, /--env-file-if-exists=\.env/);
+  assert.doesNotMatch(scripts.start, /--env-file=/);
+  for (const [name, script] of Object.entries(scripts)) assert.doesNotMatch(script, /--env-file=/, name);
+  assert.doesNotMatch(read('Dockerfile') + read('docker-compose.yml') + read('docker-compose.local-pf.yml'), /--env-file/);
+  assert.match(read('README.md'), /cp \.env\.example \.env\s+# optional/);
+  assert.match(read('README.md'), /With no setup at all/);
+});
+
+test('S4: npm start with no .env in the folder starts the server and it answers /api/health', async () => {
+  const script = JSON.parse(read('package.json')).scripts.start;
+  const tmp = runStartScript();
+  try {
+    assert.equal(fs.existsSync(path.join(tmp, '.env')), false);
+    const r = await startAndAsk(tmp, script);
+    assert.ok(r.health, `the server did not start (exit ${r.exited}): ${r.out.slice(0, 300)}`);
+    assert.equal(r.health.schema, 'demo-health/1');
+    assert.equal(r.health.state, 'needs-setup', 'no .env, no PF_BASE_URL: direction 1 is off');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('S4: a .env that exists is still read (PF_BASE_URL in it turns the health state to ready)', async () => {
+  const script = JSON.parse(read('package.json')).scripts.start;
+  const tmp = runStartScript({ '.env': 'PF_BASE_URL=https://pf.invalid:9031\n' });
+  try {
+    const r = await startAndAsk(tmp, script);
+    assert.ok(r.health, `the server did not start (exit ${r.exited}): ${r.out.slice(0, 300)}`);
+    assert.equal(r.health.state, 'ready');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+// N4: what the migration took out of the README is kept in neutral terms.
+test('N4: docs/hosted-history.md records the hosted copy, the rollback and the by-content verification, with no host, registry, digest or personal name', () => {
+  const doc = read('docs/hosted-history.md');
+  for (const needle of ['hosted copy', 'Rollback record', 'by content', 'demo-health/1', 'rollback target', 'Conformance check (manual)', 'conformance.mjs']) assert.ok(doc.includes(needle), needle);
+  assert.doesNotMatch(doc, /https?:\/\//i, 'no URL at all');
+  assert.doesNotMatch(doc, /sha256:[0-9a-f]{8}|ghcr\.io|ping-devops|cmuir|curtismu|\b[0-9a-f]{12}\b/i, 'no digest, registry, host or personal name');
+  assert.match(read('README.md'), /docs\/hosted-history\.md/);
+  assert.match(read('CLAUDE.md'), /docs\/hosted-history\.md/);
+});
+
+test('N4: the removed CI conformance job is replaced by a documented manual step (README and CLAUDE.md), and CI has no self-hosted job', () => {
+  assert.doesNotMatch(read('.github/workflows/ci.yml'), /conformance|self-hosted/);
+  for (const file of ['README.md', 'CLAUDE.md']) assert.match(read(file), /conformance\.mjs \. --new --tier=Demo/, file);
+  assert.match(read('README.md'), /always skipped on GitHub-hosted runners/);
 });

@@ -30,15 +30,17 @@ Everything else carries another tag, shown on every row and step:
 
 | Tag | Meaning | Examples in this tab |
 |---|---|---|
-| deck claim | The deck says it | the six claims above; PKCE S256 in the discovery metadata |
+| deck claim | The deck says it | the six claims above, and only the deck's own sentence in a step (the lab's additions to that step sit beside it as separate notes with their own tag) |
 | console swagger name (schema only) | A field name in the Privilege console swagger (2026-10-31 baseline); nothing was called | tenant profile `CIMD` (`Clients[]` with `URL` and `IsPrivate`, `CacheTTLHours`) and status `CIMDDocuments[]` |
-| lab reading | Behaviour the lab infers beside a deck sentence or a field name | with both available the CIMD path is taken, otherwise dynamic registration; an allowlist entry is a whole URL compared exactly; a valid document is fetched once and then cached (no expiry modelled); the discovery field names |
+| lab reading | Behaviour the lab infers beside a deck sentence or a field name | with both available the CIMD path is taken, otherwise dynamic registration; an allowlist entry is a whole URL compared exactly; a valid document is fetched once and then cached (no expiry modelled); the discovery field names, `code_challenge_methods_supported` included (the slide says PKCE (S256) is mandatory and that discovery metadata is published, not that the method is a metadata field); one record per dynamic registration |
 | lab-invented | Made up so the simulation can run | the order of the checks, the refusal codes, the validation rules (the lab's own, ported from client.dev), the failure policy, the eight simulated documents, the private-address rule |
 | measured (our note) | Measured by this lab, never on the Ping gateway | PingFederate fetched a CIMD document only for an enabled policy that listed that exact URL (one URL per policy), shown for contrast |
 
-What the deck does **not** say, listed on the tab so nothing is read into the slide: how the gateway chooses beyond "the MCP specification now prefers" CIMD; what it does when a CIMD document cannot be fetched or fails validation (the tab lets you pick refuse or fall back to dynamic registration, which is the lab's own option); whether an allowlist entry is a host, a pattern or an exact URL; cache lifetime and refresh; which validation rules apply.
+What the deck does **not** say, listed on the tab so nothing is read into the slide: how the gateway chooses beyond "the MCP specification now prefers" CIMD; what it does when a CIMD document cannot be fetched or fails validation (the tab lets you pick refuse or fall back to dynamic registration, which is the lab's own option); whether an allowlist entry is a host, a pattern or an exact URL; cache lifetime and refresh; which validation rules apply; whether a document may be flagged private (the console schema has an `IsPrivate` flag); and that the MCP specification's own client order starts with pre-registered credentials, where the lab models only CIMD versus dynamic registration.
 
-The "Why it matters" lines (challenge, technical, business) are Ping's words for the whole MCP Gateway slide, marked as a Ping claim, UNVERIFIED on our tenant. Only after the release is on our tenant and a feature has been measured there may its UNVERIFIED label be removed.
+A step that mixes a deck sentence with lab text is split per field: the step's own tag covers the deck sentence and each lab addition is a note with its own tag (for example the dynamic-registration step: the deck sentence, then "one record per registration" as a lab reading, then the issued `dcr-client-N` label as lab-invented).
+
+The "Why it matters" lines (challenge, technical, business) are quoted as printed from the Challenge and Value boxes of the MCP Gateway slide (they cover the whole slide, not the CIMD row alone) and marked as a Ping claim, UNVERIFIED on our tenant. Only after the release is on our tenant and a feature has been measured there may its UNVERIFIED label be removed.
 
 ## Run from a clone
 
@@ -50,14 +52,14 @@ cd cimd-LAB
 npm ci
 npm run build
 cp .env.example .env   # optional: set PF_BASE_URL for direction 1
-npm start              # http://127.0.0.1:5250 (loopback only)
+npm start              # http://127.0.0.1:5250 (loopback only); works with no .env too
 ```
 
 Open http://127.0.0.1:5250. For UI work run `npm start` and `npm run dev:web` (Vite on http://127.0.0.1:5251, proxying `/api`).
 
 ## Settings file
 
-This app reads its own `.env` in the repo folder (copy `.env.example`; `npm start` loads it with `node --env-file`) or the environment. It does **not** yet read the shared `~/Development/.env`; moving the PingFederate setting there would change the PingFederate lane and is left to the owner. No admin credential is read or needed.
+This app reads its own `.env` in the repo folder (copy `.env.example`; `npm start` loads it with `node --env-file-if-exists=.env`, so a missing `.env` is fine) or the environment. It does **not** yet read the shared `~/Development/.env`; moving the PingFederate setting there would change the PingFederate lane and is left to the owner. No admin credential is read or needed.
 
 - `PF_BASE_URL` (optional) - PingFederate base for direction 1. **There is no default**: unset means direction 1 is off, `/api/pf/status` and `/api/pf/probe` answer 409 `pf_not_configured`, no request is made, and the UI says "PingFederate is not configured: set PF_BASE_URL" with the buttons disabled. https only (http on loopback).
 - `ALLOWED_CLIENT_HOSTS` (optional) - comma list of client_id hosts the lab's own teaching server will fetch from; any other host is refused before a request is made (`host_not_allowed`). Unset means no allow-list. It does not affect the H2 2026 tab, which has its own allowlist field.
@@ -86,7 +88,7 @@ The PingFederate and Lab-as-server tabs are not mocked: direction 1 is real Ping
 - **Mock** (default): ten scripted scenarios from `server/src/gateway-sim-table.json`, generated from the engine by `npm run mock-table`. A test fails if the committed table differs from what the engine gives now, and another replays every scenario through the HTTP API and compares. Nothing is contacted and nothing you type is sent.
 - **Live (local engine)**: the same engine on your own nine inputs, through `POST /api/gateway-sim/evaluate`. It is a simulation in this lab's server: no network, no PingFederate, no gateway. The mode banner under the toggle shows which mode you are in; Reset returns the tab to Mock and the form to its defaults.
 
-Typed text (the client_id URL and the allowlist) is echoed back only after a best-effort mask for credential-shaped values, and every answer passes through a second masking pass. **Masking is a heuristic**, not a guarantee: it catches common token shapes, `password <value>`, `"password":"x"`, `user:pw@host` (with or without a scheme), percent-encoded text up to three layers deep, and zero-width or control characters used to hide them; a short random value with no keyword in front of it is not found. A password word followed by any word is masked too, so "password policy" is masked (a known false positive). Do not type real credentials.
+Typed text (the client_id URL and the allowlist) is echoed back only after a best-effort mask for credential-shaped values, and every answer passes through a second masking pass. **Masking is a heuristic**, not a guarantee: it catches common token shapes, `password <value>`, `"password":"x"`, `user:pw@host` (with or without a scheme), percent-encoded text up to three layers deep, every kind of space (including U+2028, U+2029, U+1680 and the Unicode space separators) between a keyword and its value, a tab or line break inside a keyword (`pass<TAB>word is x`), and zero-width or control characters used to hide them. **A value that is still percent-encoded after three decoding rounds is masked whole** (`[masked:undecodable]`): nothing legitimate is encoded four times, and a short secret under four or more layers would otherwise get through. a short random value with no keyword in front of it is not found. A password word followed by any word is masked too, so "password policy" is masked (a known false positive). Do not type real credentials. The same display rule covers the lab-as-server route `GET /as/authorize`: the `client_id`, hosts and document values it echoes in `checks[].detail`, the consent block and the refusal messages are shown with their credential-shaped parts masked (specific shapes only, so a normal URL is shown as typed); the checks themselves still run on the raw value.
 
 ## Health, doctor and reset
 
@@ -97,7 +99,7 @@ POST /api/reset  # the header Reset button: clears the caller's pending requests
 
 The app answers `GET /api/health` with `demo-health/1`. `PORT=5290 npm run doctor` runs the doctor against another port. The H2 2026 simulation keeps no state, so there is nothing of it for Reset to clear on the server.
 
-Every error is JSON with a fixed code, never an HTML page, stack or path. A missing file under `/assets/`, `/favicon.ico` and `/robots.txt` answer a JSON 404; a known route called with the wrong method answers 405 with `Allow`. The browser logs the deliberate 4xx answers (the tester's refusals, the PingFederate 409 when unconfigured, a refused Live input) as console messages; they are expected.
+Every error is JSON with a fixed code, never an HTML page, stack or path. A missing file under `/assets/`, `/favicon.ico` and `/robots.txt` answer a JSON 404; a known route called with the wrong method answers 405 with `Allow` (also a POST to a page or a file the web UI serves, such as `/`, `/h2` or `/index.html`). Method matching uses the same rules as the routes themselves: case-insensitive, one trailing slash ignored, so `GET /api/Gateway-Sim/info/` is 200 and `POST` there is a 405, not a 404. `OPTIONS` is a wrong method on the app's own routes (405 with `Allow`); under `/as/*` Express's router answers it first with 200, an `Allow` header and no CORS headers (a cross-origin browser preflight still fails there), which is kept as it was. The browser logs the deliberate 4xx answers (the tester's refusals, the PingFederate 409 when unconfigured, a refused Live input) as console messages; they are expected.
 
 ## Docker (optional)
 
@@ -113,7 +115,9 @@ Publishes `127.0.0.1:5250` only (set `PF_BASE_URL` in your shell or a `.env` bes
 npm test    # server: node --test test/*.test.js; web: vitest run
 ```
 
-On Node 26: 196 server tests and 72 web tests pass (baseline before the H2 2026 update: 126 and 51). The tests assert literal numbers (limits, counts, boundaries N accepted and N+1 refused). Mutation checks of the H2 2026 engine, masking and request validation were run by hand; none of their scripts is shipped.
+**Conformance (manual, before a repo or a PR):** `node <demo-kit-base checkout>/scripts/conformance.mjs . --new --tier=Demo` must show 0 FAIL (rule 18 only warns). CI no longer carries a conformance job: it needed a self-hosted checkout of demo-kit-base and was always skipped on GitHub-hosted runners. The hosted copy's history, rollback record and by-content verification are in `docs/hosted-history.md`.
+
+On Node 26: 231 server tests and 81 web tests pass (baseline before the H2 2026 update: 126 and 51). The tests assert literal numbers (limits, counts, boundaries N accepted and N+1 refused). Mutation checks of the H2 2026 engine, masking and request validation were run by hand; none of their scripts is shipped.
 
 ## Troubleshooting
 
@@ -150,7 +154,7 @@ On Node 26: 196 server tests and 72 web tests pass (baseline before the H2 2026 
 
 ### Web UI
 
-`npm run build` builds `web/dist`, and `npm start` serves it with the API on http://127.0.0.1:5250. Six tabs: Learn, PingFederate as server, Lab as server, H2 2026: gateway and CIMD, Stories, Talk track. Stories and Talk track draw from the same data in `stories/` (see below). Diagrams are `diagram-studio/1` JSON in `web/src/diagrams`, four of them; the H2 2026 tab's is `gateway-cimd-preference`. The shared stylesheet `web/src/standalone-ui.css` is vendored byte for byte from AI-DEMO-Standalone (`check-drift.sh` pins it).
+`npm run build` builds `web/dist`, and `npm start` serves it with the API on http://127.0.0.1:5250. Six tabs: Learn, PingFederate as server, Lab as server, H2 2026: gateway and CIMD, Stories, Talk track. Presenter mode is the header button or the P key (Esc leaves it); the banner stays on every tab. Keys with Ctrl, Cmd or Alt, auto-repeat and keys typed in a field are ignored. Stories and Talk track draw from the same data in `stories/` (see below). Diagrams are `diagram-studio/1` JSON in `web/src/diagrams`, four of them; the H2 2026 tab's is `gateway-cimd-preference`. The shared stylesheet `web/src/standalone-ui.css` is vendored byte for byte from AI-DEMO-Standalone (`check-drift.sh` pins it).
 
 ### Stories, customer config and workspaces
 

@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "test": "npm test -w server && npm test -w web",
-    "start": "node --env-file=.env server/src/index.js",
+    "start": "node --env-file-if-exists=.env server/src/index.js",
     "build": "npm run build -w web",
     "dev:web": "npm run dev -w web",
     "doctor": "node scripts/doctor.mjs",
