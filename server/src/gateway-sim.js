@@ -88,7 +88,8 @@ function parseHttps(value) {
 }
 
 function privateHost(url) {
-  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  // A trailing dot is the same name ("localhost." is "localhost"), so it is removed before the name checks.
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.+$/, '');
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local')) return true;
   // A host written as an address is checked with the lab's own SSRF rule; a name is assumed to resolve publicly (nothing is resolved here).
   return /^[0-9.]+$|:/.test(host) ? isPrivateAddress(host) : false;
@@ -128,7 +129,7 @@ export const METADATA_TAGS = Object.freeze({
   issuer: 'lab-invented',
   authorization_endpoint: 'lab-invented',
   token_endpoint: 'lab-invented',
-  code_challenge_methods_supported: 'deck claim',
+  code_challenge_methods_supported: 'lab reading', // the deck says "mandatory PKCE (S256)" and "published discovery metadata", not that the method is a metadata field
   client_id_metadata_document_supported: 'lab reading',
   registration_endpoint: 'lab reading',
 });
@@ -164,6 +165,7 @@ export function evaluate(body, { traceId }) {
     ok: true,
     tag: 'deck claim',
     detail: 'The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.',
+    notes: [{ tag: 'lab reading', text: 'The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only "discovery metadata".' }],
     hop: hop('GET /.well-known/oauth-authorization-server', `200 ${Object.keys(metadata).join(', ')}`),
   });
 
@@ -174,7 +176,11 @@ export function evaluate(body, { traceId }) {
       title: 'Dynamic client registration',
       ok: true,
       tag: 'deck claim',
-      detail: `The gateway's authorization server also offers dynamic client registration (deck). In the lab each fresh connection registers a new client and the gateway keeps one record per registration (lab reading). Issued: dcr-client-${counts.dcrRecords} (mock-issued label, not a real credential).`,
+      detail: 'The deck says the gateway\'s authorization server also offers dynamic client registration.',
+      notes: [
+        { tag: 'lab reading', text: 'In the lab each fresh connection registers a new client and the gateway keeps one record per registration.' },
+        { tag: 'lab-invented', text: `Issued: dcr-client-${counts.dcrRecords} (a mock-issued label, not a real credential).` },
+      ],
       hop: hop(`POST ${GATEWAY}/register`, `201 client_id dcr-client-${counts.dcrRecords}`),
     });
     return { outcome: 'registered', via: 'dcr', reason: null };
@@ -187,8 +193,9 @@ export function evaluate(body, { traceId }) {
       id: 'present',
       title: 'Client presents a document URL as its client_id',
       ok: Boolean(url),
-      tag: 'deck claim',
-      detail: url ? `client_id: ${echoUrl}` : 'The client_id is not an https URL, so there is no document to fetch.',
+      tag: url ? 'deck claim' : 'lab-invented', // "a client identifies itself by a document URL" is the deck's; refusing a non-https client_id is the lab's rule
+      detail: url ? 'The deck says a client identifies itself by a document URL the tenant has allowlisted.' : 'The client_id is not an https URL, so there is no document to fetch (the lab\'s own rule).',
+      notes: [{ tag: 'lab-invented', text: `The simulated client presents client_id: ${echoUrl}` }],
       hop: hop(`GET ${GATEWAY}/authorize?client_id=${echoUrl}`, url ? 'checking' : '400'),
     });
     if (!url) return { ok: false, reason: 'client_id_not_https_url' };
@@ -201,7 +208,7 @@ export function evaluate(body, { traceId }) {
       tag: 'lab reading',
       detail: listed
         ? 'Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says "a document URL the tenant has allowlisted" and no more).'
-        : 'No: the gateway does not fetch a document the tenant has not allowlisted (deck). The lab compares the whole URL text exactly.',
+        : 'No: the lab does not fetch a document the tenant has not allowlisted (its reading of "a document URL the tenant has allowlisted"). The lab compares the whole URL text exactly.',
     });
     if (!listed) return { ok: false, reason: 'not_allowlisted' };
 
@@ -236,7 +243,8 @@ export function evaluate(body, { traceId }) {
       title: 'Gateway fetches the document',
       ok: true,
       tag: 'deck claim',
-      detail: `The gateway fetches the document (deck). Simulated body: ${Buffer.byteLength(text)} bytes of JSON${input.document === 'oversize' ? ' (not shown)' : ''}.`,
+      detail: 'The deck says the gateway fetches the document.',
+      notes: [{ tag: 'lab-invented', text: `Simulated body: ${Buffer.byteLength(text)} bytes of JSON${input.document === 'oversize' ? ' (not shown)' : ''}.` }],
       hop: hop(`GET ${echoUrl}`, `200 application/json ${Buffer.byteLength(text)} bytes`),
       document: input.document === 'oversize' ? null : cleanEchoJson(text),
     });
@@ -256,7 +264,7 @@ export function evaluate(body, { traceId }) {
 
     cache.add(input.clientIdUrl);
     counts.cacheEntries = cache.size;
-    steps.push({ id: 'cache', title: 'Gateway caches the document', ok: true, tag: 'deck claim', detail: 'Only a valid document is cached (lab reading). No expiry is modelled; the console schema names a CacheTTLHours field, but its behaviour is not stated.' });
+    steps.push({ id: 'cache', title: 'Gateway caches the document', ok: true, tag: 'deck claim', detail: 'The deck says the gateway caches the document.', notes: [{ tag: 'lab reading', text: 'Only a valid document is cached.' }, { tag: 'console swagger name (schema only)', text: 'The console schema names a CacheTTLHours field; its behaviour is not stated and no expiry is modelled.' }] });
     return { ok: true, reason: null };
   }
 
@@ -284,7 +292,7 @@ export function evaluate(body, { traceId }) {
     attempts.push({ n, ...result, steps });
   }
 
-  const last = attempts[0];
+  const first = attempts[0]; // the summary reports the first fresh connection
   return {
     schema: SCHEMA,
     traceId,
@@ -298,10 +306,10 @@ export function evaluate(body, { traceId }) {
     },
     attempts,
     summary: {
-      outcome: last.outcome,
-      via: last.via,
-      reason: last.reason,
-      fellBackFrom: last.fellBackFrom ?? null,
+      outcome: first.outcome,
+      via: first.via,
+      reason: first.reason,
+      fellBackFrom: first.fellBackFrom ?? null,
       ...counts,
     },
   };

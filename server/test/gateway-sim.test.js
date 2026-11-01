@@ -79,7 +79,8 @@ test('attempts: every dynamic registration leaves one record, numbered 1 to N', 
     const r = run({ clientSupportsCimd: false, attempts: n });
     assert.equal(r.summary.dcrRecords, n);
     assert.equal(r.summary.fetches, 0);
-    assert.equal(r.attempts.at(-1).steps.find((s) => s.id === 'dcr').detail.includes(`dcr-client-${n}`), true);
+    const dcr = r.attempts.at(-1).steps.find((s) => s.id === 'dcr');
+    assert.equal(dcr.notes.some((note) => note.text.includes(`dcr-client-${n}`)), true);
   }
 });
 
@@ -127,6 +128,38 @@ test('private addresses are refused even when listed', () => {
   }
   const pub = 'https://8.8.8.8/oauth/client.json';
   assert.equal(run({ clientIdUrl: pub, allowlist: [pub], attempts: 1 }).summary.outcome, 'registered');
+});
+
+// A trailing dot names the same host ("localhost." is "localhost"): the name checks run on the name without it.
+test('private addresses: a trailing dot does not turn a reserved name into a public one', () => {
+  for (const host of ['localhost.', 'a.localhost.', 'LOCALHOST.', 'printer.local.', 'meta.internal.', 'db.internal.', 'localhost..', 'x.local..']) {
+    const u = `https://${host}/a.json`;
+    const r = run({ clientIdUrl: u, allowlist: [u], attempts: 1 });
+    assert.equal(r.summary.reason, 'private_address', host);
+    assert.equal(r.summary.fetches, 0, host);
+    assert.ok(!r.attempts[0].steps.some((s) => s.id === 'fetch'), `${host}: no "Gateway fetches the document" step`);
+  }
+  // Names that merely END like a reserved one, or sit next to one, stay public.
+  for (const host of ['notlocalhost.example', 'local.example', 'internal.example', 'localhostx.example']) {
+    const u = `https://${host}/a.json`;
+    assert.equal(run({ clientIdUrl: u, allowlist: [u], attempts: 1 }).summary.outcome, 'registered', host);
+  }
+});
+
+test('private addresses: a trailing-dot PUBLIC name is not private (the validator refuses it later, as an invalid document)', () => {
+  const u = 'https://client.example./a.json';
+  const r = run({ clientIdUrl: u, allowlist: [u], attempts: 1 });
+  assert.equal(r.summary.reason, 'document_invalid');
+});
+
+test('private addresses: every spelling of a loopback or private address is refused (decimal, hex, octal, short, mapped, NAT64, 6to4, Teredo, %2e, fullwidth, ideographic dots, userinfo)', () => {
+  const hosts = ['2130706433', '0x7f000001', '0177.0.0.1', '127.1', '127.0.0.1.', '[::ffff:127.0.0.1]', '[::ffff:7f00:1]', '[64:ff9b::7f00:1]', '[2002:7f00:1::]', '[2001::1]', '127%2e0%2e0%2e1', '\uff11\uff12\uff17.0.0.1', '127\u30020\u30020\u30021', 'client.example@127.0.0.1', 'user:pw@10.0.0.5', '[fe80::1]', '[fd00::1]', '0', '0.0.0.0', '100.64.0.1', '169.254.169.254', '192.0.0.1'];
+  for (const host of hosts) {
+    const u = `https://${host}/a.json`;
+    const r = run({ clientIdUrl: u, allowlist: [u], attempts: 1 });
+    assert.equal(r.summary.reason, 'private_address', host);
+    assert.equal(r.summary.fetches, 0, host);
+  }
 });
 
 test('document: what the simulated web serves decides the outcome (eight kinds, literal)', () => {
@@ -189,7 +222,9 @@ test('the discovery metadata follows the two gateway flags, and every key has a 
   assert.equal(discoveryMetadata({ gatewayAdvertisesCimd: false, gatewayOffersDcr: true }).client_id_metadata_document_supported, undefined);
   assert.deepEqual(discoveryMetadata({ gatewayAdvertisesCimd: false, gatewayOffersDcr: false }).code_challenge_methods_supported, ['S256']);
   for (const key of Object.keys(discoveryMetadata({ gatewayAdvertisesCimd: true, gatewayOffersDcr: true }))) assert.ok(Object.hasOwn(METADATA_TAGS, key), key);
-  assert.equal(METADATA_TAGS.code_challenge_methods_supported, 'deck claim');
+  // The slide says "mandatory PKCE (S256)" and "Published discovery metadata"; that the method is a metadata FIELD is the lab's reading of RFC 8414.
+  assert.equal(METADATA_TAGS.code_challenge_methods_supported, 'lab reading');
+  assert.ok(!Object.values(METADATA_TAGS).includes('deck claim'), 'no metadata field is a deck claim: the slide names none');
 });
 
 test('every step carries one of the five tags, and the deck-claim steps are the ones the deck states', () => {
@@ -353,7 +388,7 @@ test('claims: five tags; every claim has exactly one of them; counts are the lab
   assert.deepEqual([count('deck claim'), count('console swagger name (schema only)'), count('lab reading'), count('lab-invented'), count('measured (our note)')], [6, 2, 5, 3, 1]);
   assert.equal(CLAIMS.length, 17);
   assert.equal(new Set(CLAIMS.map((c) => c.id)).size, 17);
-  assert.equal(NOT_STATED.length, 5);
+  assert.equal(NOT_STATED.length, 7);
 });
 
 test('claims: the deck-claim rows quote slide 36 and name it', () => {
@@ -372,11 +407,65 @@ test('claims: nothing the deck does not state is tagged as a deck claim (fallbac
   for (const id of ['cimd-over-dcr', 'dcr-otherwise', 'exact-url', 'cache-run', 'metadata-names']) assert.equal(CLAIMS.find((c) => c.id === id).tag, 'lab reading');
 });
 
-test('why it matters: the challenge and the two value lines from the deck, marked as Ping claims', () => {
+test('why it matters: the Challenge and Value boxes of slide 36, quoted as printed, marked as Ping claims', () => {
   assert.match(WHY.status, /Ping claim, UNVERIFIED on our tenant/);
-  assert.match(WHY.challenge, /^One shared token and every tool exposed to every caller/);
-  assert.match(WHY.technical, /^Per-user identity, per-tool policy and injected credentials on every call/);
-  assert.match(WHY.business, /^MCP integrations proceed under existing governance/);
+  // Read from the slide (page 36 of the deck PDF): these strings are the slide's, not a paraphrase.
+  assert.equal(WHY.challenge, 'An MCP server typically authenticates with one shared token and exposes every tool to every caller \u2014 no attribution, no per-tool control. Security cannot approve that, so MCP adoption stalls in review.');
+  assert.equal(WHY.technical, 'per-user identity, per-tool policy and injected credentials on every call, fully audited.');
+  assert.equal(WHY.business, 'MCP integrations proceed under existing governance, cutting time to value on agent projects.');
+  assert.match(WHY.note, /^Quoted as printed from the Challenge and Value boxes of the MCP Gateway slide \(slide 36\)/);
+  assert.match(WHY.note, /whole slide, not for the CIMD row alone/);
+  assert.doesNotMatch(WHY.note, /the deck's words/);
+});
+
+test('NOT_STATED names the console IsPrivate flag and the MCP specification\'s pre-registered-credentials order', () => {
+  assert.ok(NOT_STATED.some((line) => /IsPrivate/.test(line) && /modelCIMDClient/.test(line) && /gateway's own network/.test(line)));
+  assert.ok(NOT_STATED.some((line) => /pre-registered credentials/.test(line) && /only CIMD versus dynamic registration/.test(line)));
+});
+
+test('the metadata-names claim covers all three discovery fields and says the deck does not name the PKCE field', () => {
+  const claim = CLAIMS.find((c) => c.id === 'metadata-names');
+  assert.equal(claim.tag, 'lab reading');
+  for (const field of ['client_id_metadata_document_supported', 'registration_endpoint', 'code_challenge_methods_supported']) assert.ok(claim.text.includes(field), field);
+  assert.match(claim.source, /does not say the PKCE method is listed in a metadata field/);
+});
+
+// A step's detail carries only what its tag claims. Text of another tag sits in its own note with its own tag.
+test('steps: a deck-claim step carries only the deck sentence; lab text rides in notes with their own tag', () => {
+  const ok = new Set(TAGS.map((t) => t.tag));
+  const kinds = new Set();
+  for (const sc of SCENARIOS) for (const a of evaluate(sc.input, { traceId: TRACE }).attempts) for (const step of a.steps) {
+    for (const note of step.notes ?? []) { assert.ok(ok.has(note.tag), `${sc.id}/${step.id} note tag`); assert.equal(typeof note.text, 'string'); kinds.add(`${step.id}:${note.tag}`); }
+    if (step.tag === 'deck claim') {
+      assert.match(step.detail, /^The deck says /, `${sc.id}/${step.id}`);
+      assert.doesNotMatch(step.detail, /lab reading|lab-invented|\(deck\)|dcr-client|Simulated body|one record|expiry/i, `${sc.id}/${step.id}`);
+      assert.ok((step.notes ?? []).every((note) => note.tag !== 'deck claim'), 'a note is never a second deck claim');
+    }
+  }
+  for (const must of ['discovery:lab reading', 'present:lab-invented', 'fetch:lab-invented', 'cache:lab reading', 'cache:console swagger name (schema only)', 'dcr:lab reading', 'dcr:lab-invented']) assert.ok(kinds.has(must), must);
+});
+
+test('steps: the dcr step splits its tags (deck sentence; one record per registration is a lab reading; the issued label is lab-invented)', () => {
+  const dcr = run({ clientSupportsCimd: false, attempts: 1 }).attempts[0].steps.find((s) => s.id === 'dcr');
+  assert.equal(dcr.tag, 'deck claim');
+  assert.equal(dcr.detail, 'The deck says the gateway\'s authorization server also offers dynamic client registration.');
+  assert.deepEqual(dcr.notes.map((n) => n.tag), ['lab reading', 'lab-invented']);
+  assert.match(dcr.notes[0].text, /one record per registration/);
+  assert.match(dcr.notes[1].text, /^Issued: dcr-client-1 /);
+});
+
+test('steps: the cache step splits its tags (the deck says "caches it"; only-valid is a lab reading; CacheTTLHours is a swagger name)', () => {
+  const cache = run({ attempts: 1 }).attempts[0].steps.find((s) => s.id === 'cache');
+  assert.equal(cache.tag, 'deck claim');
+  assert.equal(cache.detail, 'The deck says the gateway caches the document.');
+  assert.deepEqual(cache.notes.map((n) => n.tag), ['lab reading', 'console swagger name (schema only)']);
+  assert.match(cache.notes[0].text, /Only a valid document is cached/);
+  assert.match(cache.notes[1].text, /CacheTTLHours/);
+});
+
+test('steps: a non-https client_id is the lab\'s own rule, so that step is lab-invented; an https one is the deck\'s "document URL"', () => {
+  assert.equal(run({ clientIdUrl: 'http://client.example/x.json', allowlist: ['http://client.example/x.json'], attempts: 1 }).attempts[0].steps.find((s) => s.id === 'present').tag, 'lab-invented');
+  assert.equal(run({ attempts: 1 }).attempts[0].steps.find((s) => s.id === 'present').tag, 'deck claim');
 });
 
 test('defaults: the web form starts from a scenario that passes validation', () => {

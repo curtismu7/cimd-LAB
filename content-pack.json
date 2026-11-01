@@ -143,9 +143,9 @@
     },
     {
       "id": "why-it-matters-gateway",
-      "label": "Why it matters: the MCP gateway (Ping's words)",
+      "label": "Why it matters: the MCP gateway (quoted from the slide)",
       "group": "concept",
-      "description": "Ping claim, UNVERIFIED on our tenant. Challenge: one shared token and every tool exposed to every caller, so security stalls adoption. Technical: per-user identity, per-tool policy and injected credentials on every call, fully audited. Business: MCP integrations proceed under existing governance; faster time to value on agent projects.",
+      "description": "Ping claim, UNVERIFIED on our tenant, quoted from the Challenge and Value boxes of the MCP Gateway slide. Challenge: An MCP server typically authenticates with one shared token and exposes every tool to every caller — no attribution, no per-tool control. Security cannot approve that, so MCP adoption stalls in review. Technical: per-user identity, per-tool policy and injected credentials on every call, fully audited. Business: MCP integrations proceed under existing governance, cutting time to value on agent projects.",
       "action": {
         "type": "route",
         "href": "/"

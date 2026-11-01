@@ -36,7 +36,7 @@ export const CLAIMS = Object.freeze([
   { id: 'dcr-otherwise', tag: 'lab reading', text: 'A client that presents no document URL, or a gateway that does not advertise CIMD, gets dynamic registration.', source: 'Follows from the two deck sentences about CIMD and about dynamic registration; the deck does not state the rule.' },
   { id: 'exact-url', tag: 'lab reading', text: 'An allowlist entry is the whole document URL, compared exactly.', source: 'Read from the field names Clients[].URL and "a document URL the tenant has allowlisted"; matching rules are not stated.' },
   { id: 'cache-run', tag: 'lab reading', text: 'A valid document is fetched once and then served from the cache; each fresh dynamic registration leaves one record on the gateway.', source: 'The deck says "caches it". Record-per-registration is the Learn tab\'s reading of RFC 7591; no expiry or refresh rule is modelled.' },
-  { id: 'metadata-names', tag: 'lab reading', text: 'The discovery fields client_id_metadata_document_supported and registration_endpoint.', source: 'Names from the CIMD draft and RFC 8414; the deck says only "discovery metadata".' },
+  { id: 'metadata-names', tag: 'lab reading', text: 'The discovery fields client_id_metadata_document_supported, registration_endpoint and code_challenge_methods_supported.', source: 'Names from the CIMD draft and RFC 8414. The deck says "mandatory PKCE (S256)" and "published discovery metadata"; it does not say the PKCE method is listed in a metadata field.' },
   { id: 'failure-policy', tag: 'lab-invented', text: 'What the gateway does when the CIMD path fails after it was chosen: refuse, or fall back to dynamic registration. The Failure policy field chooses.', source: 'The deck is silent. Both options are the lab\'s.' },
   { id: 'check-order', tag: 'lab-invented', text: 'The order of the checks (URL form, allowlist, address, fetch, validate, cache), the refusal codes, and the validation rules (the lab\'s own, ported from client.dev).', source: 'The deck says allowlisted, fetched, validated, cached, and nothing about rules or codes.' },
   { id: 'simulated-web', tag: 'lab-invented', text: 'The eight simulated documents, the placeholder hosts (.example) and the mock-issued dcr-client-N labels.', source: 'Nothing is fetched. The simulated web is in this process.' },
@@ -50,14 +50,16 @@ export const NOT_STATED = Object.freeze([
   'Whether an allowlist entry is a host, a URL pattern or an exact URL; how long a cached document lives; when it is refreshed.',
   'Which validation rules the gateway applies to a document, and what it refuses to fetch (private addresses, redirects, size).',
   'Whether CIMD advertising depends on the allowlist being non-empty (the console schema description says an empty list disables CIMD; the lab keeps the two settings separate).',
+  'Whether a document may be marked private (the console schema\'s modelCIMDClient has an IsPrivate flag: documents reachable only from the gateway\'s own network). The lab has no such flag and refuses every private address.',
+  'How a client is chosen when several registration methods are possible. The MCP specification\'s own order starts with pre-registered credentials; the lab models only CIMD versus dynamic registration.',
 ]);
 
-// Section 10 of the H2 2026 prompt: the Challenge and Value lines for the MCP Gateway (slide 36). Ping claims, UNVERIFIED on our tenant.
+// The Challenge and Value boxes of the MCP Gateway slide (slide 36), quoted as printed (the prompt file's section 10 paraphrases them; the slide wins). Ping claims, UNVERIFIED on our tenant.
 export const WHY = Object.freeze({
   feature: 'MCP Gateway (slide 36)',
   status: 'Ping claim, UNVERIFIED on our tenant',
-  challenge: 'One shared token and every tool exposed to every caller: no attribution, no per-tool control, so security stalls adoption.',
-  technical: 'Per-user identity, per-tool policy and injected credentials on every call, fully audited.',
-  business: 'MCP integrations proceed under existing governance; faster time to value on agent projects.',
-  note: 'These are the deck\'s words for the whole MCP Gateway slide, not for the CIMD row alone.',
+  challenge: 'An MCP server typically authenticates with one shared token and exposes every tool to every caller \u2014 no attribution, no per-tool control. Security cannot approve that, so MCP adoption stalls in review.',
+  technical: 'per-user identity, per-tool policy and injected credentials on every call, fully audited.',
+  business: 'MCP integrations proceed under existing governance, cutting time to value on agent projects.',
+  note: 'Quoted as printed from the Challenge and Value boxes of the MCP Gateway slide (slide 36). They are for the whole slide, not for the CIMD row alone.',
 });
