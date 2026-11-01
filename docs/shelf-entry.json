@@ -2,7 +2,7 @@
   "id": "cimd-lab",
   "name": "CIMD Lab",
   "kind": "Demo",
-  "description": "Teaches OAuth Client ID Metadata Documents both ways: real PingFederate as the authorization server (owner-run, no mock), and the lab's own teaching server with a tester that breaks the document in a dozen ways. PingFederate acting as a CIMD client is UNVERIFIED.",
+  "description": "Teaches OAuth Client ID Metadata Documents both ways: real PingFederate as the authorization server (owner-run, no mock), and the lab's own teaching server with a tester that breaks the document in a dozen ways. PingFederate acting as a CIMD client is UNVERIFIED. The H2 2026 tab adds a local simulation of an MCP gateway that prefers CIMD client registration: Mock table and Live engine, every claim tagged, Ping release claim UNVERIFIED on our tenant.",
   "url": "http://localhost:5250",
   "healthPath": "/api/health",
   "composeFile": "docker-compose.yml",

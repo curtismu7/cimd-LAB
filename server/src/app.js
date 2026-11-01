@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,10 @@ import { createWorkspaces } from './workspace.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { renderStory, verticalList, StoryError } from './stories.js';
 import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js';
+import { evaluate, SimRefused, SCHEMA as SIM_SCHEMA, LIMITS as SIM_LIMITS, DEFAULTS as SIM_DEFAULTS, DOCUMENTS as SIM_DOCUMENTS, FAILURE_POLICIES as SIM_POLICIES, METADATA_TAGS } from './gateway-sim.js';
+import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim-claims.js';
+import { MOCK_TABLE } from './gateway-sim-table.js';
+import { maskDeep } from './mask.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
 const MAX_PASTED_BYTES = 16 * 1024;
@@ -44,6 +49,17 @@ function createRateLimiter({ now, hosted }) {
   };
 }
 
+// Known routes and the methods they take (HEAD rides along with GET). Used only to answer a wrong method with 405 and an Allow header.
+const GET = ['GET', 'HEAD'];
+const POST = ['POST'];
+const ROUTE_METHODS = new Map([
+  ['/api/health', GET], ['/api/config', GET], ['/api/stories', GET], ['/api/validate', POST], ['/api/tester/run', POST],
+  ['/api/pf/status', GET], ['/api/pf/probe', POST], ['/api/reset', POST], ['/api/gateway-sim/info', GET], ['/api/gateway-sim/mock', GET],
+  ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
+  ['/as/.well-known/oauth-authorization-server', GET],
+]);
+const allowedMethods = (pathname) => (/^\/api\/stories\/[^/]+$/.test(pathname) || /^\/fixtures\/[^/]+\.json$/.test(pathname) ? GET : ROUTE_METHODS.get(pathname) ?? null);
+
 // Every error is JSON with a fixed code: no message, stack or path ever reaches the client.
 export function jsonErrorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
@@ -54,7 +70,7 @@ export function jsonErrorHandler(err, req, res, next) {
   return res.status(500).json({ error: 'server_error' });
 }
 
-export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile } = {}) {
+export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile, simulate = evaluate } = {}) {
   const app = express();
   // customer.config.json (or CUSTOMER_CONFIG): validated once at start; bad fields fall back and are reported.
   const customer = loadCustomerConfig({ file: customerFile, env });
@@ -168,6 +184,24 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     return res.json(validateCimdDocument(parsed, null));
   });
 
+  // H2 2026 tab: a local simulation of an MCP gateway that prefers CIMD client registration. No network, no PingFederate. Stateless: nothing is
+  // kept per workspace, so there is nothing to evict. Every answer passes through maskDeep.
+  app.get('/api/gateway-sim/info', (req, res) => {
+    res.set('Cache-Control', 'no-store').json({
+      schema: SIM_SCHEMA, banner: BANNER_TEXT, slide: SLIDE, tags: TAGS, claims: CLAIMS, notStated: NOT_STATED, why: WHY,
+      defaults: SIM_DEFAULTS, limits: SIM_LIMITS, documents: SIM_DOCUMENTS, failurePolicies: SIM_POLICIES, metadataTags: METADATA_TAGS,
+    });
+  });
+  app.get('/api/gateway-sim/mock', (req, res) => res.set('Cache-Control', 'no-store').json(MOCK_TABLE));
+  app.post('/api/gateway-sim/evaluate', limit('gateway-sim'), express.json({ limit: '64kb' }), (req, res) => {
+    try {
+      res.set('Cache-Control', 'no-store').json(maskDeep(simulate(req.body, { traceId: crypto.randomBytes(16).toString('hex') })));
+    } catch (error) {
+      if (!(error instanceof SimRefused)) return res.status(500).json({ error: 'server_error' });
+      return res.status(400).json({ error: error.code, ...(error.field ? { field: error.field } : {}) });
+    }
+  });
+
   // Direction 2 tester: probe the lab's own authorization server.
   app.post('/api/tester/run', limit('tester'), async (req, res) => {
     // The tester calls /as over loopback without a cookie, so it presents a one-run token that maps to this caller's workspace.
@@ -223,8 +257,16 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   // The built web UI, when it exists. Registered last so it never shadows an API route.
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
     app.use(express.static(webDist));
-    app.get(/^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)).*/, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
+    // Only an address with no file extension and outside /assets/ is a page; a missing file (/assets/x.js, /favicon.ico, /robots.txt) is a JSON 404.
+    app.get(/^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)|assets(\/|$))(?:[^/]*\/)*[^/.]*$/, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
   }
+
+  // A known route called with the wrong method is a 405 with Allow, not a 404.
+  app.use((req, res, next) => {
+    const allow = allowedMethods(req.path);
+    if (allow && !allow.includes(req.method)) return res.status(405).set('Allow', allow.join(', ')).json({ error: 'method_not_allowed' });
+    return next();
+  });
 
   // Last: every error is JSON, with no stack, message or path.
   app.use((req, res) => res.status(404).json({ error: 'not_found' }));

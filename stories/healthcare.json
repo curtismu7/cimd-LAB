@@ -19,6 +19,7 @@
     "probe": "The probe gives PingFederate {{cast.client}}'s address. A move to sign-in means it was accepted; HTTP 400 means no enabled policy matches the address.",
     "direction2": "The lab is now {{cast.company}}'s teaching sign-in server. {{cast.user}} sees a consent screen built from {{cast.client}}'s file and approves; the access token is the lab's opaque teaching value.",
     "refusals": "A tool pretending to be {{cast.client}} with a mismatched id, a secret in the file, an oversize body or a redirect is stopped at a named check; a reused code fails.",
+    "gateway-prefers-cimd": "{{cast.company}}'s gateway, as the deck describes one, only trusts documents the tenant has allowlisted. {{cast.clientUrl}} is on the list, so the gateway fetches, validates and caches it for {{cast.assistant}}. A {{cast.clientWord}} that cannot present an address registers dynamically. Ping release claim, UNVERIFIED on our tenant.",
     "close": "{{cast.company}} avoids a registration step and relies on how strictly the server reads the file. Reset clears the lab."
   }
 }

@@ -5,16 +5,23 @@ import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
 import TalkTrack from './views/TalkTrack.jsx';
 import Stories from './views/Stories.jsx';
+import H2View from './views/H2View.jsx';
 
 export const TABS = [
   { id: 'learn', label: 'Learn', View: Learn },
   { id: 'pf', label: 'PingFederate as server', View: PfView },
   { id: 'lab', label: 'Lab as server', View: LabView },
+  { id: 'h2', label: 'H2 2026: gateway and CIMD', View: H2View },
   { id: 'stories', label: 'Stories', View: Stories },
   { id: 'talk', label: 'Talk track', View: TalkTrack },
 ];
 
 export const BANNER = 'PingFederate parts use real PingFederate. The lab\'s own server is a teaching server, not a product. Tests with canned PingFederate replies prove nothing about PingFederate.';
+
+export const RELEASE_BANNER = 'Ping release claim, UNVERIFIED on our tenant: the H2 2026 tab simulates a claim from Ping\'s deck (release dated 2026-11-02). It is a local simulation, not PingFederate and not the Ping gateway.';
+
+export const MODE_PF = 'Mode: real PingFederate (direction 1) and the lab\'s teaching server (direction 2)';
+export const MODE_H2 = 'Mode: local simulation of a Ping release claim (Mock or Live, chosen on this tab); not PingFederate, not the Ping gateway';
 
 export const HOSTED_BANNER = 'Hosted copy: direction 2 is simulated by the lab\'s teaching server; direction 1 uses real PingFederate. State here is ephemeral, lost on restart, and kept per visitor: Reset clears only yours.';
 
@@ -44,7 +51,8 @@ export default function App() {
     return () => { live = false; };
   }, []);
 
-  // Branding from the server's validated customer config. Only a #rrggbb value is ever set as a colour.
+  // Branding from the server's validated customer config. Only a #rrggbb value is ever set as a colour. The page's own colours come from the shared
+  // stylesheet; the customer's accent is used only as a decorative edge of the header (--cust-accent).
   useEffect(() => {
     const root = document.documentElement.style;
     const hex = /^#[0-9a-f]{6}$/i;
@@ -79,17 +87,17 @@ export default function App() {
 
   return (
     <div className={`app${presenter ? ' presenter' : ''}`}>
-      <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER}</div>
+      <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER} {RELEASE_BANNER}</div>
       <header className="bar">
         <h1>{customer.name}</h1>
-        <span className="mode" data-testid="mode">Mode: real PingFederate (direction 1) and the lab's teaching server (direction 2)</span>
+        <span className="mode" data-testid="mode">{tab === 'h2' ? MODE_H2 : MODE_PF}</span>
         {!presenter && (
           <div className="actions">
             <button type="button" onClick={reset}>Reset</button>
             <button type="button" onClick={() => setTheme(nextTheme)} aria-label={`Theme: ${theme}. Switch to ${nextTheme}`}>Theme: {theme}</button>
           </div>
         )}
-        <button type="button" aria-pressed={presenter} className={presenter ? 'on' : ''} onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
+        <button type="button" aria-pressed={presenter} onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
         {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
       </header>
       {!presenter && (
@@ -104,7 +112,6 @@ export default function App() {
               aria-selected={tab === t.id}
               aria-controls="tabpanel"
               tabIndex={tab === t.id ? 0 : -1}
-              className={tab === t.id ? 'on' : ''}
               onClick={() => setTab(t.id)}
             >{t.label}</button>
           ))}
@@ -113,7 +120,7 @@ export default function App() {
       {presenter && (
         <nav className="tabs presenter-tabs" aria-label="Views">
           {TABS.map((t) => (
-            <button key={t.id} type="button" aria-pressed={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+            <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
           ))}
         </nav>
       )}

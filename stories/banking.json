@@ -19,6 +19,7 @@
     "probe": "{{cast.client}}'s address goes to PingFederate. Moving on to sign-in means the file was fetched and accepted; an HTTP 400 means there is no enabled policy for that address.",
     "direction2": "The lab becomes the bank's teaching sign-in server. {{cast.user}} approves a request for {{cast.client}} on a consent screen built from the fetched file, and the token that follows is clearly labelled as the lab's.",
     "refusals": "A forged {{cast.client}} file with the wrong id, a published secret, a huge body or a redirect is refused at a named check, and a code used twice fails the second time.",
+    "gateway-prefers-cimd": "In this story {{cast.company}}'s gateway has {{cast.clientUrl}} on its allowlist. {{cast.assistant}} presents the address, the gateway fetches and checks the file and caches it, and no registration record is created. A {{cast.clientWord}} without an address registers dynamically instead. Ping release claim, UNVERIFIED on our tenant.",
     "close": "For {{cast.company}}, CIMD means no pre-registration queue, and the bank's care moves into how the server fetches and checks files. Reset clears the lab."
   }
 }

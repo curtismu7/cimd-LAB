@@ -30,9 +30,9 @@ test('docker-compose publishes on loopback only', () => {
   assert.deepEqual(published, ['127.0.0.1:5250:5250']);
 });
 
-test('Dockerfile: Node 22 alpine, npm ci, non-root, no secrets baked in', () => {
+test('Dockerfile: Node 26 alpine, npm ci, non-root, no secrets baked in', () => {
   const dockerfile = read('Dockerfile');
-  assert.match(dockerfile, /FROM node:22-alpine AS build/);
+  assert.match(dockerfile, /FROM node:26-alpine AS build/);
   assert.match(dockerfile, /npm ci/);
   assert.match(dockerfile, /^USER node$/m);
   assert.doesNotMatch(dockerfile, /COPY \.env|PF_BASE_URL=/);
@@ -172,7 +172,10 @@ test('the hosted deployment names no secret and the repo carries no hosts other 
   const OWN_HOST = 'cimd-lab.ai-demo.ping-devops.com';
   const OWN_DOCS = new Set(['README.md', 'docs/shelf-entry.json']);
   const ownOk = (h) => h === OWN_HOST && where.get(h).every((f) => OWN_DOCS.has(f));
-  assert.deepEqual([...hosts].filter((h) => !allowed(h) && !ownOk(h)).sort(), []);
+  // Two more hosts appear in named files only: the family's repo URL and the CI gitleaks download (github.com), and the JSON Schema dialect id (json-schema.org).
+  const SCOPED = { 'github.com': new Set(['README.md', '.github/workflows/ci.yml']), 'json-schema.org': new Set(['docs/content-pack.schema.json']) };
+  const scopedOk = (h) => Object.hasOwn(SCOPED, h) && where.get(h).every((f) => SCOPED[h].has(f));
+  assert.deepEqual([...hosts].filter((h) => !allowed(h) && !ownOk(h) && !scopedOk(h)).sort(), []);
 });
 
 test('content pack and shelf entry are well formed and portable', () => {
@@ -183,17 +186,19 @@ test('content pack and shelf entry are well formed and portable', () => {
   assert.equal(shelf.id, 'cimd-lab');
   assert.equal(shelf.healthPath, '/api/health');
   assert.ok(!path.isAbsolute(shelf.composeFile) && fs.existsSync(path.join(root, shelf.composeFile)));
+  assert.equal(pack.demo.catalog, 'D36');
+  assert.equal(shelf.catalogId, 'D36');
 });
 
-test('CI: self-hosted runner, checkout v5, Node 22 on PRs and 20+22 on main, scans present', () => {
+test('CI: GitHub-hosted runners, checkout v5, Node 26 only, build, test, doctor, content pack and scans present', () => {
   const ci = read('.github/workflows/ci.yml');
   assert.match(ci, /actions\/checkout@v5/);
   assert.match(ci, /actions\/setup-node@v5/);
-  assert.match(ci, /fromJSON\('\[22\]'\)/);
-  assert.match(ci, /fromJSON\('\[20, 22\]'\)/);
-  assert.match(ci, /gitleaks/);
-  assert.match(ci, /forbidden-strings/);
-  assert.match(ci, /conformance\.mjs/);
+  assert.doesNotMatch(ci, /self-hosted/);
+  assert.match(ci, /runs-on: ubuntu-latest/);
+  assert.deepEqual([...new Set([...ci.matchAll(/node-version: (\S+)/g)].map((m) => m[1]))], ['26']);
+  for (const needle of ['npm run build', 'npm test', 'npm run doctor', 'validate-content-pack.mjs', 'gitleaks detect', 'FORBIDDEN_STRINGS']) assert.ok(ci.includes(needle), needle);
+  for (const job of ['build:', 'test:', 'doctor:', 'forbidden-strings:', 'gitleaks:']) assert.ok(ci.includes(`\n  ${job}`), job);
 });
 
 test('PF_BASE_URL has no default anywhere shipped: .env.example and compose are empty, README and CLAUDE.md say so', () => {

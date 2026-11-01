@@ -47,7 +47,7 @@ describe('tabs and cross-cutting chrome', () => {
 });
 
 describe('tablist follows the ARIA tab pattern', () => {
-  const names = ['Learn', 'PingFederate as server', 'Lab as server', 'Stories', 'Talk track'];
+  const names = ['Learn', 'PingFederate as server', 'Lab as server', 'H2 2026: gateway and CIMD', 'Stories', 'Talk track'];
   const tab = (name) => screen.getByRole('tab', { name });
 
   it('only the selected tab is in the tab order, and the panel is labelled by it', async () => {

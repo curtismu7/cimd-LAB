@@ -12,6 +12,15 @@
     "start": "node --env-file=.env server/src/index.js",
     "build": "npm run build -w web",
     "dev:web": "npm run dev -w web",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "mock-table": "node scripts/build-mock-table.mjs",
+    "talk-track": "node scripts/build-talk-track.mjs",
+    "content-pack": "node scripts/validate-content-pack.mjs"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
   }
 }

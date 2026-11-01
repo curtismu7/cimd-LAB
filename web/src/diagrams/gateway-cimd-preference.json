@@ -1,0 +1,167 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "gateway-cimd-preference",
+  "title": "Which registration path the gateway takes (simulation)",
+  "lede": "Ping release claim, UNVERIFIED on our tenant. The deck says the MCP specification prefers CIMD over dynamic registration and that the gateway offers both. The choice and the fallback are the lab's reading.",
+  "groups": {
+    "client": {
+      "label": "The client",
+      "color": "dark"
+    },
+    "gateway": {
+      "label": "The gateway (simulated)",
+      "color": "blue"
+    },
+    "web": {
+      "label": "Hosted by the client",
+      "color": "grey"
+    },
+    "dcr": {
+      "label": "Dynamic registration",
+      "color": "red"
+    }
+  },
+  "nodes": [
+    {
+      "id": "client",
+      "group": "client",
+      "label": "Client",
+      "sub": [
+        "Wants to register"
+      ],
+      "x": 0,
+      "y": 120
+    },
+    {
+      "id": "discovery",
+      "group": "gateway",
+      "label": "Discovery metadata",
+      "sub": [
+        "Advertises CIMD support",
+        "deck claim"
+      ],
+      "x": 340,
+      "y": 0
+    },
+    {
+      "id": "choose",
+      "group": "gateway",
+      "label": "Registration choice",
+      "sub": [
+        "CIMD preferred over DCR",
+        "The choice: lab reading"
+      ],
+      "x": 340,
+      "y": 240
+    },
+    {
+      "id": "allow",
+      "group": "gateway",
+      "label": "Tenant allowlist",
+      "sub": [
+        "Is this URL listed?",
+        "Allowlist: deck claim",
+        "Exact match: lab reading"
+      ],
+      "x": 680,
+      "y": 240
+    },
+    {
+      "id": "doc",
+      "group": "web",
+      "label": "Client document",
+      "sub": [
+        "https URL is the client_id",
+        "No secret in it"
+      ],
+      "x": 1020,
+      "y": 240
+    },
+    {
+      "id": "cache",
+      "group": "gateway",
+      "label": "Fetch, validate, cache",
+      "sub": [
+        "Valid documents are cached",
+        "deck claim"
+      ],
+      "x": 1360,
+      "y": 240
+    },
+    {
+      "id": "dcr",
+      "group": "dcr",
+      "label": "Registration endpoint",
+      "sub": [
+        "Offered by the gateway: deck claim",
+        "Used when CIMD is not available: lab reading"
+      ],
+      "x": 680,
+      "y": 440
+    }
+  ],
+  "edges": [
+    {
+      "source": "client",
+      "target": "discovery",
+      "label": "1 read metadata"
+    },
+    {
+      "source": "client",
+      "target": "choose",
+      "label": "2 authorize with a URL"
+    },
+    {
+      "source": "choose",
+      "target": "allow",
+      "label": "3 CIMD chosen"
+    },
+    {
+      "source": "allow",
+      "target": "doc",
+      "label": "4 fetch if listed"
+    },
+    {
+      "source": "doc",
+      "target": "cache",
+      "label": "5 JSON back"
+    },
+    {
+      "source": "choose",
+      "target": "dcr",
+      "label": "no URL or no CIMD"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Read the discovery metadata",
+      "what": "Deck claim: the gateway advertises CIMD support in its discovery metadata, and publishes metadata so compliant clients connect without custom configuration.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Choose a path",
+      "what": "Lab reading: when the gateway advertises CIMD and the client presents a document URL, CIMD is taken. The deck states that the MCP specification prefers CIMD over dynamic registration.",
+      "edges": [
+        1,
+        2
+      ]
+    },
+    {
+      "title": "Allowlist, fetch, validate, cache",
+      "what": "Deck claim: the client identifies itself by a document URL the tenant has allowlisted, and the gateway fetches, validates and caches it. The order of the checks and the validation rules are lab-invented.",
+      "edges": [
+        3,
+        4
+      ]
+    },
+    {
+      "title": "Otherwise dynamic registration",
+      "what": "Lab reading: a client with no document URL, or a gateway that does not advertise CIMD, registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server.",
+      "edges": [
+        5
+      ]
+    }
+  ]
+}

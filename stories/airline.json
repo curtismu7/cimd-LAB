@@ -19,6 +19,7 @@
     "probe": "The probe sends {{cast.client}}'s address to PingFederate. A sign-in page means it fetched and accepted the file; an HTTP 400 means no policy there matches that address.",
     "direction2": "Now the lab plays {{cast.company}}'s sign-in server. It receives {{cast.client}}'s address from {{cast.user}}'s request, fetches the file and shows {{cast.user}} a consent screen built from it before any seat or miles change.",
     "refusals": "A look-alike assistant claims to be {{cast.client}} but its file names a different id, or hides a secret in the open. The server stops it at the named check, and {{cast.user}} never sees a consent screen for it.",
+    "gateway-prefers-cimd": "At {{cast.company}} the made-up gateway lists {{cast.clientUrl}}. {{cast.assistant}} presents it, the gateway fetches, validates and caches the file, and {{cast.user}}'s next connection is served from the cache. A {{cast.clientWord}} with no address registers dynamically. Ping release claim, UNVERIFIED on our tenant.",
     "close": "{{cast.company}} saves the registration step for every assistant its flyers use and keeps the trust where it belongs: in the file and in how strictly the server reads it. Reset clears the lab for the next audience."
   }
 }
