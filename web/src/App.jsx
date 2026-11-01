@@ -68,6 +68,20 @@ export default function App() {
     writeStored('cimd-theme', theme);
   }, [theme]);
 
+  // P toggles presenter mode, Esc leaves it. Keys with a modifier (browser and OS shortcuts), auto-repeat, and keys typed into a field or a
+  // composition are ignored, so typing "p" in the client_id box never switches the page.
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      if (event.key === 'p' || event.key === 'P') setPresenter((p) => !p);
+      else if (event.key === 'Escape') setPresenter(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const reset = async () => {
     const r = await api.reset();
     setResetKey((k) => k + 1);
@@ -97,7 +111,7 @@ export default function App() {
             <button type="button" onClick={() => setTheme(nextTheme)} aria-label={`Theme: ${theme}. Switch to ${nextTheme}`}>Theme: {theme}</button>
           </div>
         )}
-        <button type="button" aria-pressed={presenter} onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
+        <button type="button" aria-pressed={presenter} aria-keyshortcuts="P Escape" title="Keys: P toggles, Esc leaves" onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
         {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
       </header>
       {!presenter && (

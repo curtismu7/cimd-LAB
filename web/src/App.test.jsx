@@ -20,6 +20,65 @@ beforeEach(() => {
   }));
 });
 
+describe('presenter mode keys', () => {
+  const press = (key, init = {}, target = document.body) => act(() => { target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })); });
+  const presenting = () => screen.getByRole('button', { name: 'Presenter mode' }).getAttribute('aria-pressed') === 'true';
+
+  it('P toggles presenter mode (either case), Esc leaves it, and the banner stays', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { name: 'What CIMD is' });
+    expect(presenting()).toBe(false);
+    press('p');
+    expect(presenting()).toBe(true);
+    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
+    press('Escape');
+    expect(presenting()).toBe(false);
+    press('P', { shiftKey: true });
+    expect(presenting()).toBe(true);
+    press('P');
+    expect(presenting()).toBe(false);
+    press('Escape');
+    expect(presenting()).toBe(false);
+  });
+
+  it('keys with a modifier, auto-repeat, other keys and prevented events do nothing', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { name: 'What CIMD is' });
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { repeat: true }]) { press('p', init); expect(presenting()).toBe(false); }
+    press('q');
+    press('Enter');
+    expect(presenting()).toBe(false);
+    press('p');
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }]) { press('Escape', init); expect(presenting()).toBe(true); }
+    press('Escape');
+  });
+
+  it('keys typed into a field are ignored, and the listener is removed on unmount', async () => {
+    const { unmount } = render(<App />);
+    await screen.findByRole('heading', { name: 'What CIMD is' });
+    for (const tag of ['input', 'textarea', 'select']) {
+      const el = document.body.appendChild(document.createElement(tag));
+      press('p', {}, el);
+      expect(presenting()).toBe(false);
+      el.remove();
+    }
+    const editable = document.body.appendChild(document.createElement('div'));
+    editable.setAttribute('contenteditable', 'true');
+    press('p', {}, editable);
+    expect(presenting()).toBe(false);
+    editable.remove();
+    const added = vi.spyOn(window, 'addEventListener');
+    const removed = vi.spyOn(window, 'removeEventListener');
+    const second = render(<App />);
+    const handler = added.mock.calls.filter(([type]) => type === 'keydown').at(-1)[1];
+    second.unmount();
+    expect(removed.mock.calls.some(([type, fn]) => type === 'keydown' && fn === handler)).toBe(true);
+    added.mockRestore();
+    removed.mockRestore();
+    unmount();
+  });
+});
+
 describe('tabs and cross-cutting chrome', () => {
   it('shows the banner and switches tabs, also in presenter mode', async () => {
     const user = userEvent.setup();

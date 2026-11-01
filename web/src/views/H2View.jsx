@@ -34,6 +34,9 @@ function Steps({ steps }) {
         <li key={`${step.id}-${index}`} data-state={step.ok ? 'ok' : 'bad'}>
           <p className="sim-steps__title"><strong>{step.title}</strong> <span className="sim-steps__state">{step.ok ? 'passed' : 'stopped here'}</span> <Tag tag={step.tag} /></p>
           <p className="sim-steps__detail">{step.detail}</p>
+          {(step.notes ?? []).map((note, i) => (
+            <p className="sim-steps__detail" key={`note-${i}`}><Tag tag={note.tag} /> {note.text}</p>
+          ))}
           {step.hop ? (
             <details>
               <summary>Hop: request and response</summary>
@@ -158,7 +161,7 @@ function LiveForm({ info, form, setForm, onRun, busy }) {
       </fieldset>
       <label htmlFor={`${id}-attempts`}>Fresh connections in this run ({info.limits.minAttempts} to {info.limits.maxAttempts})</label>
       <input id={`${id}-attempts`} type="number" min={info.limits.minAttempts} max={info.limits.maxAttempts} value={form.attempts} onChange={(e) => set('attempts', e.target.value)} />
-      <p className="hint">Text you type is echoed back only after a best-effort mask for credential-shaped values. That is a heuristic, not a guarantee. Do not type real credentials.</p>
+      <p className="hint">Text you type is echoed back only after a best-effort mask for credential-shaped values. That is a heuristic, not a guarantee. A value still percent-encoded after three decoding rounds is masked whole. Do not type real credentials.</p>
       <button type="submit" className="primary" disabled={busy}>Evaluate</button>
     </form>
   );
@@ -191,6 +194,9 @@ function H2Body({ resetKey, presenter }) {
     return () => { live = false; };
   }, []);
 
+  // Anything that changes what the screen is about (a new scenario, the other mode) disowns a run still in flight: its answer would otherwise land
+  // above a form it does not belong to. Evaluate itself bumps the counter too, so only the newest run owns the screen.
+  const disown = () => { seq.current += 1; setBusy(false); };
   const evaluate = async () => {
     const mine = ++seq.current;
     setBusy(true);
@@ -199,7 +205,8 @@ function H2Body({ resetKey, presenter }) {
     setRun(r);
     setBusy(false);
   };
-  const load = (input) => { setForm(toForm(input)); setRun(null); setMode('live'); };
+  const load = (input) => { disown(); setForm(toForm(input)); setRun(null); setMode('live'); };
+  const switchMode = (next) => { if (next === mode) return; disown(); setMode(next); };
 
   return (
     <div className="view h2">
@@ -210,8 +217,8 @@ function H2Body({ resetKey, presenter }) {
       {info ? (
         <>
           <div className="mode-toggle" role="group" aria-label="Mode for this tab">
-            <button type="button" aria-pressed={mode === 'mock'} onClick={() => setMode('mock')}>Mock</button>
-            <button type="button" aria-pressed={mode === 'live'} onClick={() => setMode('live')}>Live (local engine)</button>
+            <button type="button" aria-pressed={mode === 'mock'} onClick={() => switchMode('mock')}>Mock</button>
+            <button type="button" aria-pressed={mode === 'live'} onClick={() => switchMode('live')}>Live (local engine)</button>
           </div>
           <div className="banner" role="note" data-state={mode === 'live' ? 'live' : undefined} data-testid="mode-banner">{MODE_TEXT[mode]}</div>
 

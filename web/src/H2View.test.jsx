@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, within, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App, { RELEASE_BANNER, TABS, MODE_H2, MODE_PF } from './App.jsx';
 import H2View, { MODE_TEXT } from './views/H2View.jsx';
@@ -40,7 +40,7 @@ describe('H2 2026 tab: claims and tags', () => {
     expect([...tagsShown].sort()).toEqual(TAGS.map((t) => t.tag).sort());
     expect(TAGS).toHaveLength(5);
     expect(screen.getByRole('heading', { name: 'What the deck does not say' })).toBeInTheDocument();
-    expect(within(screen.getByRole('heading', { name: 'What the deck does not say' }).nextElementSibling).getAllByRole('listitem')).toHaveLength(5);
+    expect(within(screen.getByRole('heading', { name: 'What the deck does not say' }).nextElementSibling).getAllByRole('listitem')).toHaveLength(7);
     expect(screen.getByText(WHY.challenge)).toBeInTheDocument();
     expect(screen.getByText(WHY.technical)).toBeInTheDocument();
     expect(screen.getByText(WHY.business)).toBeInTheDocument();
@@ -184,7 +184,8 @@ describe('H2 2026 tab: Live', () => {
     expect(within(result).getAllByText(/^Attempt \d:/)).toHaveLength(3);
     expect(within(result).getAllByRole('listitem').filter((li) => li.querySelector('.tag-badge')).length).toBeGreaterThanOrEqual(10);
     expect(within(result).getByText('client_id_metadata_document_supported').closest('li')).toHaveTextContent('lab reading');
-    expect(within(result).getByText('code_challenge_methods_supported').closest('li')).toHaveTextContent('deck claim');
+    expect(within(result).getByText('code_challenge_methods_supported').closest('li')).toHaveTextContent('lab reading');
+    expect(within(result).getByText('code_challenge_methods_supported').closest('li')).not.toHaveTextContent('deck claim');
     expect(result).toHaveTextContent(`Trace id for this run: ${RESULT.traceId}`);
   });
 
@@ -223,11 +224,97 @@ describe('H2 2026 tab: Live', () => {
     expect(evaluate).not.toBeDisabled();
   });
 
+  // A stale answer must never land above a form it does not belong to (the visitor loaded another scenario, or left Live, while it was in flight).
+  // The slow request is settled inside act(), with one macrotask turn so every promise hop of the client has run before the negative assertion.
+  const settle = async (pending, index, data = RESULT) => {
+    await act(async () => { pending[index].resolve({ ok: true, status: 200, json: async () => data }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+  };
+  const inFlight = async (user) => {
+    const pending = [];
+    evaluateReply = (body) => new Promise((resolve) => pending.push({ body, resolve }));
+    render(<H2View resetKey={0} />);
+    await live(user);
+    fireEvent.click(screen.getByRole('button', { name: 'Evaluate' }));
+    await waitFor(() => expect(pending).toHaveLength(1));
+    return pending;
+  };
+
+  it('"Run this in Live" while a run is in flight: the slow answer is dropped, the form keeps the loaded scenario, Evaluate is usable', async () => {
+    const user = userEvent.setup();
+    const pending = await inFlight(user);
+    await user.click(screen.getByRole('button', { name: 'Mock' }));
+    await user.click(within(screen.getByTestId('mock-row-private-address')).getByRole('button', { name: 'Run this in Live' }));
+    expect(screen.getByLabelText('client_id URL')).toHaveValue('https://10.0.0.5/oauth/client.json');
+    expect(screen.getByRole('button', { name: 'Evaluate' })).not.toBeDisabled();
+    await settle(pending, 0);
+    expect(screen.queryByTestId('sim-result')).toBeNull();
+    expect(screen.getByLabelText('client_id URL')).toHaveValue('https://10.0.0.5/oauth/client.json');
+  });
+
+  it('leaving Live while a run is in flight drops its answer: coming back shows no result and an enabled Evaluate', async () => {
+    const user = userEvent.setup();
+    const pending = await inFlight(user);
+    await user.click(screen.getByRole('button', { name: 'Mock' }));
+    await settle(pending, 0);
+    await user.click(screen.getByRole('button', { name: /^Live/ }));
+    expect(screen.queryByTestId('sim-result')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Evaluate' })).not.toBeDisabled();
+  });
+
+  it('two runs overlapping (a submit while one is in flight): the newer one owns the screen even if the older lands last', async () => {
+    const user = userEvent.setup();
+    const pending = await inFlight(user);
+    fireEvent.submit(screen.getByRole('button', { name: 'Evaluate' }).closest('form'));
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await settle(pending, 1, { ...RESULT, traceId: 'b'.repeat(32) });
+    expect(await screen.findByText(/Trace id for this run/)).toHaveTextContent('b'.repeat(32));
+    await settle(pending, 0, { ...RESULT, traceId: 'a'.repeat(32) });
+    expect(screen.getByText(/Trace id for this run/)).toHaveTextContent('b'.repeat(32));
+    expect(screen.getByText(/Trace id for this run/)).not.toHaveTextContent('a'.repeat(32));
+  });
+
+  it('clicking the mode that is already shown does not drop the run in flight', async () => {
+    const user = userEvent.setup();
+    const pending = await inFlight(user);
+    await user.click(screen.getByRole('button', { name: /^Live/ }));
+    await settle(pending, 0);
+    expect(await screen.findByTestId('sim-result')).toBeInTheDocument();
+  });
+
+  it('Reset while a run is in flight: the tab is back in Mock and the slow answer never shows', async () => {
+    const pending = [];
+    evaluateReply = (body) => new Promise((resolve) => pending.push({ body, resolve }));
+    const user = userEvent.setup();
+    const { rerender } = render(<H2View resetKey={0} />);
+    await live(user);
+    fireEvent.click(screen.getByRole('button', { name: 'Evaluate' }));
+    await waitFor(() => expect(pending).toHaveLength(1));
+    rerender(<H2View resetKey={1} />);
+    await screen.findByTestId('mock-table');
+    await settle(pending, 0);
+    expect(screen.queryByTestId('sim-result')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Mock' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('a step that mixes deck wording with lab text shows each note with its own tag', async () => {
+    const mixed = { ...RESULT, attempts: [{ ...RESULT.attempts[0], steps: [{ id: 'dcr', title: 'Dynamic client registration', ok: true, tag: 'deck claim', detail: 'The deck says X.', notes: [{ tag: 'lab reading', text: 'One record per registration.' }, { tag: 'lab-invented', text: 'Issued: dcr-client-1.' }] }] }] };
+    evaluateReply = () => json(mixed);
+    const user = userEvent.setup();
+    render(<H2View resetKey={0} />);
+    await live(user);
+    await user.click(screen.getByRole('button', { name: 'Evaluate' }));
+    const result = await screen.findByTestId('sim-result');
+    const note = within(result).getByText(/One record per registration/).closest('p');
+    expect(note.querySelector('.tag-badge')).toHaveAttribute('data-tag', 'lab reading');
+    expect(within(result).getByText(/Issued: dcr-client-1/).closest('p').querySelector('.tag-badge')).toHaveAttribute('data-tag', 'lab-invented');
+  });
+
   it('the form says what the mask is: a heuristic', async () => {
     const user = userEvent.setup();
     render(<H2View resetKey={0} />);
     await live(user);
     expect(screen.getByText(/best-effort mask for credential-shaped values. That is a heuristic, not a guarantee/)).toBeInTheDocument();
+    expect(screen.getByText(/still percent-encoded after three decoding rounds is masked whole/)).toBeInTheDocument();
   });
 });
 
