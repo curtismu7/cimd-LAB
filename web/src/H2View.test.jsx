@@ -113,30 +113,62 @@ describe('H2 2026 tab: Live', () => {
     expect(calls.find((c) => c.url === '/api/gateway-sim/evaluate').init.method).toBe('POST');
   });
 
-  it('every editable field reaches the request (each one changed on its own)', async () => {
+  const CHECKS = [['Advertises CIMD in its discovery metadata', 'gatewayAdvertisesCimd'], ['Offers dynamic client registration', 'gatewayOffersDcr'], ['Presents a document URL as its client_id', 'clientSupportsCimd'], ['Can register dynamically', 'clientSupportsDcr']];
+  const send = async (user) => { await user.click(screen.getByRole('button', { name: 'Evaluate' })); await waitFor(() => expect(screen.getByTestId('sim-result')).toBeInTheDocument()); return evaluateBody(); };
+
+  // Each editable field is changed on its own and must reach the request: nine tests, one per field.
+  for (const [label, key] of CHECKS) {
+    it(`field ${key}: unticking it sends false, ticking it again sends true`, async () => {
+      const user = userEvent.setup();
+      render(<H2View resetKey={0} />);
+      await live(user);
+      await user.click(screen.getByLabelText(label));
+      expect((await send(user))[key]).toBe(false);
+      await user.click(screen.getByLabelText(label));
+      expect((await send(user))[key]).toBe(true);
+    });
+  }
+
+  it('field clientIdUrl: the typed text is sent', async () => {
     const user = userEvent.setup();
     render(<H2View resetKey={0} />);
     await live(user);
-    const run = async () => { await user.click(screen.getByRole('button', { name: 'Evaluate' })); await waitFor(() => expect(screen.getByTestId('sim-result')).toBeInTheDocument()); return evaluateBody(); };
-    for (const [label, key] of [['Advertises CIMD in its discovery metadata', 'gatewayAdvertisesCimd'], ['Offers dynamic client registration', 'gatewayOffersDcr'], ['Presents a document URL as its client_id', 'clientSupportsCimd'], ['Can register dynamically', 'clientSupportsDcr']]) {
-      await user.click(screen.getByLabelText(label));
-      expect((await run())[key]).toBe(false);
-      await user.click(screen.getByLabelText(label));
-      expect((await run())[key]).toBe(true);
-    }
     const url = screen.getByLabelText('client_id URL');
-    await user.clear(url); await user.type(url, 'https://other.example/a.json');
-    expect((await run()).clientIdUrl).toBe('https://other.example/a.json');
+    await user.clear(url);
+    await user.type(url, 'https://other.example/a.json');
+    expect((await send(user)).clientIdUrl).toBe('https://other.example/a.json');
+  });
+
+  it('field document: the chosen kind is sent', async () => {
+    const user = userEvent.setup();
+    render(<H2View resetKey={0} />);
+    await live(user);
     await user.selectOptions(screen.getByLabelText('What the simulated web serves at that URL'), 'shared_secret');
-    expect((await run()).document).toBe('shared_secret');
-    const allow = screen.getByLabelText(/^Allowlist/);
-    await user.clear(allow); fireEvent.change(allow, { target: { value: 'https://a.example/1\n\n  \nhttps://b.example/2\n' } });
-    expect((await run()).allowlist).toEqual(['https://a.example/1', 'https://b.example/2']);
+    expect((await send(user)).document).toBe('shared_secret');
+  });
+
+  it('field allowlist: one entry per non-blank line is sent', async () => {
+    const user = userEvent.setup();
+    render(<H2View resetKey={0} />);
+    await live(user);
+    fireEvent.change(screen.getByLabelText(/^Allowlist/), { target: { value: 'https://a.example/1\n\n  \nhttps://b.example/2\n' } });
+    expect((await send(user)).allowlist).toEqual(['https://a.example/1', 'https://b.example/2']);
+  });
+
+  it('field onCimdFailure: the chosen policy is sent', async () => {
+    const user = userEvent.setup();
+    render(<H2View resetKey={0} />);
+    await live(user);
     await user.click(screen.getByLabelText('Fall back to dynamic registration'));
-    expect((await run()).onCimdFailure).toBe('fall_back_to_dcr');
-    const attempts = screen.getByLabelText(/^Fresh connections/);
-    fireEvent.change(attempts, { target: { value: '5' } });
-    expect((await run()).attempts).toBe(5);
+    expect((await send(user)).onCimdFailure).toBe('fall_back_to_dcr');
+  });
+
+  it('field attempts: the number is sent as a number', async () => {
+    const user = userEvent.setup();
+    render(<H2View resetKey={0} />);
+    await live(user);
+    fireEvent.change(screen.getByLabelText(/^Fresh connections/), { target: { value: '5' } });
+    expect((await send(user)).attempts).toBe(5);
   });
 
   it('shows the counts, the tagged discovery metadata, and one block of steps per attempt, each step with a tag', async () => {

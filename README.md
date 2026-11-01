@@ -113,7 +113,7 @@ Publishes `127.0.0.1:5250` only (set `PF_BASE_URL` in your shell or a `.env` bes
 npm test    # server: node --test test/*.test.js; web: vitest run
 ```
 
-On Node 26: 196 server tests and 64 web tests pass (baseline before the H2 2026 update: 126 and 51). The tests assert literal numbers (limits, counts, boundaries N accepted and N+1 refused). Mutation checks of the H2 2026 engine, masking and request validation were run by hand; none of their scripts is shipped.
+On Node 26: 196 server tests and 72 web tests pass (baseline before the H2 2026 update: 126 and 51). The tests assert literal numbers (limits, counts, boundaries N accepted and N+1 refused). Mutation checks of the H2 2026 engine, masking and request validation were run by hand; none of their scripts is shipped.
 
 ## Troubleshooting
 
