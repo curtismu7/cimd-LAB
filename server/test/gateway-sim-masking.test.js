@@ -130,3 +130,43 @@ test('the running server writes none of it to stdout or stderr, and a missing pa
   }
   assert.equal(child.exitCode === null && child.signalCode === null, false, 'the server process was stopped');
 });
+
+// S2 and S3 through HTTP: the three fields that echo typed text are clientIdUrl, allowlist[0] and allowlist[1] (the answer shows all three).
+test('S2: a keyword followed by U+2028, U+2029, U+1680 (or tab inside the keyword) is masked in clientIdUrl, allowlist[0] and allowlist[1]', async () => {
+  const lab = await startLab();
+  try {
+    const typed = ['password\u2028Hunter2xyzQ9', 'password\u2029Hunter2xyzQ9', 'password\u1680Hunter2xyzQ9', 'secret\u2028s3cr3tVal99', 'api key\u2028x9y8z7w6v5', 'pass\tword is Hunter2xyzQ9', 'pw\u2028Hunter2xyzQ9'];
+    const bad = /Hunter2xyzQ9|s3cr3tVal99|x9y8z7w6v5/;
+    for (const value of typed) {
+      for (const body of [
+        withGood({ clientIdUrl: value, allowlist: [value], attempts: 1 }),
+        withGood({ allowlist: [value, GOOD.allowlist[0]], attempts: 1 }),
+        withGood({ allowlist: [GOOD.allowlist[0], value], attempts: 1 }),
+      ]) {
+        const r = await post(lab.base, '/api/gateway-sim/evaluate', body);
+        const text = await r.text();
+        assert.equal(r.status, 200, JSON.stringify(value));
+        assert.ok(!bad.test(text), `${JSON.stringify(value)} leaked: ${text.slice(0, 200)}`);
+      }
+    }
+  } finally { await lab.close(); }
+});
+
+test('S3: four, five and ten layers of percent-encoding are masked whole in every echoing field', async () => {
+  const lab = await startLab();
+  try {
+    const enc = (t, n) => { let x = t; for (let i = 0; i < n; i += 1) x = encodeURIComponent(x); return x; };
+    for (const original of ['password=hunter2xyz', 'password hunter2xyz', 'my password is hunter2xyz', 'pw: hunter2xyz', 'https://bob:hunter2xyz@h.example/x']) {
+      for (const layers of [4, 5, 10]) {
+        const value = enc(original, layers);
+        for (const body of [withGood({ clientIdUrl: value, allowlist: [value], attempts: 1 }), withGood({ allowlist: [GOOD.allowlist[0], value], attempts: 1 })]) {
+          const r = await post(lab.base, '/api/gateway-sim/evaluate', body);
+          const text = await r.text();
+          assert.equal(r.status, 200);
+          assert.ok(!text.includes('hunter2xyz'), `${original} x${layers}`);
+          assert.ok(text.includes('[masked:undecodable]'), `${original} x${layers}: the whole value is masked, and says so`);
+        }
+      }
+    }
+  } finally { await lab.close(); }
+});

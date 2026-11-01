@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DETECTORS, SPECIFIC, cleanEcho, findCredentials, maskText, percentRounds, PERCENT_ROUNDS, MAX_ECHO, flatten } from '../src/credentials.js';
-import { maskDeep } from '../src/mask.js';
+import { DETECTORS, SPECIFIC, cleanEcho, findCredentials, maskText, percentRounds, percentOverflow, PERCENT_ROUNDS, MAX_ECHO, UNDECODABLE, flatten } from '../src/credentials.js';
+import { maskDeep, maskResponseText } from '../src/mask.js';
 import { evaluate } from '../src/gateway-sim.js';
 import { SCENARIOS } from '../src/gateway-sim-scenarios.js';
 import { SECRETS, NEEDLE, PLAIN } from './secrets.js';
@@ -80,7 +80,7 @@ test('fullwidth look-alikes are normalised before matching', () => {
   assert.ok(!cleanEcho(full).includes('hunter2xyz') && !cleanEcho(full).includes('ｈｕｎｔｅｒ'));
 });
 
-test('percent-encoding: one, two and three layers are decoded and masked; four layers are not decoded (the bound)', () => {
+test('percent-encoding: one, two and three layers are decoded and masked; the decoding stops at the bound of three rounds', () => {
   const enc = (t, n) => { let x = t; for (let i = 0; i < n; i += 1) x = encodeURIComponent(x); return x; };
   for (const n of [1, 2, 3]) {
     assert.ok(!cleanEcho(`x ${enc('password hunter2xyz', n)}`).includes('hunter2xyz'), `${n} layer(s)`);
@@ -155,4 +155,119 @@ test('maskDeep leaves every scripted result unchanged (no static text of the eng
     assert.deepEqual(maskDeep(r), r, sc.id);
     assert.doesNotMatch(JSON.stringify(r), /\[masked:/, sc.id);
   }
+});
+
+// ---- S2: every separator a reader sees as a space ----
+const SPACE_LIKE = [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '　', '\t', '\n', '\r', '\r\n', '   '];
+
+test('S2: flatten turns every space separator (Zs, Zl, Zp, tab, LF, CR) into a plain space', () => {
+  for (const sep of SPACE_LIKE) assert.equal(flatten(`a${sep}b`).replace(/ +/g, ' '), 'a b', JSON.stringify(sep));
+  assert.equal(flatten('a b c d'), 'a b c d');
+  assert.equal(flatten('a\u0000b'), 'ab', 'a control character is still deleted, not turned into a space');
+});
+
+test('S2: keyword + any space-like separator + value is masked (password, pw, secret, api key, token, dash form, "is" form)', () => {
+  const cases = [
+    (sep) => `password${sep}Hunter2xyzQ9`, (sep) => `pw${sep}Hunter2xyzQ9`, (sep) => `pwd${sep}Hunter2xyzQ9`, (sep) => `passcode${sep}Hunter2xyzQ9`,
+    (sep) => `secret${sep}s3cr3tVal99`, (sep) => `api key${sep}Hunter2xyzQ9`, (sep) => `api${sep}key${sep}Hunter2xyzQ9`, (sep) => `token${sep}9f8e7d6c5b4a39281716`,
+    (sep) => `my${sep}password${sep}is${sep}Hunter2xyzQ9`, (sep) => `password${sep}-${sep}Hunter2xyzQ9`,
+  ];
+  for (const sep of SPACE_LIKE) for (const make of cases) {
+    const input = make(sep);
+    const out = cleanEcho(input);
+    assert.ok(!/Hunter2xyzQ9|s3cr3tVal99|9f8e7d6c5b4a/.test(out), `${JSON.stringify(input)} -> ${out}`);
+    assert.match(out, /\[masked:/, JSON.stringify(input));
+  }
+});
+
+test('S2: the three values from the review, through cleanEcho, exactly', () => {
+  for (const sep of [' ', ' ', ' ']) assert.equal(cleanEcho(`password${sep}Hunter2xyzQ9`), '[masked:password-space]', JSON.stringify(sep));
+  assert.ok(!cleanEcho('secret s3cr3tVal99').includes('s3cr3tVal99'));
+  assert.ok(!cleanEcho('api key x9y8z7w6v5').includes('x9y8z7w6v5'));
+});
+
+test('S2: a tab, LF, CR, U+2028 or U+2029 INSIDE a keyword does not hide it (read both as a separator and deleted)', () => {
+  for (const sep of ['\t', '\n', '\r', ' ', ' ']) {
+    for (const input of [`pass${sep}word is Hunter2xyzQ9`, `pass${sep}word Hunter2xyzQ9`, `pass${sep}word=Hunter2xyzQ9`, `sec${sep}ret s3cr3tVal99`, `api${sep}key x9y8z7w6v5a`]) {
+      const out = cleanEcho(input);
+      assert.ok(!/Hunter2xyzQ9|s3cr3tVal99|x9y8z7w6v5a/.test(out), `${JSON.stringify(input)} -> ${out}`);
+    }
+  }
+  // maskText sees the same thing without cleanEcho in front of it
+  assert.ok(!maskText('pass\tword is Hunter2xyzQ9').includes('Hunter2xyzQ9'));
+});
+
+test('S2: the masked span of a keyword split by a separator is exactly the credential: the text around it is untouched, nothing of the value is left', () => {
+  for (const sep of ['\t', '\n', '\r', '\u2028', '\u2029']) {
+    assert.equal(cleanEcho(`before pass${sep}word is Hunter2xyzQ9 after`), 'before [masked:password-is] after', JSON.stringify(sep));
+    assert.equal(cleanEcho(`a pass${sep}word=Hunter2xyzQ9 b`), 'a [masked:assignment] b', JSON.stringify(sep));
+    assert.equal(cleanEcho(`xx sec${sep}ret s3cr3tVal99 yy`), 'xx [masked:secret-space] yy', JSON.stringify(sep));
+    assert.equal(cleanEcho(`one${sep}two pass${sep}word is Hunter2xyzQ9`), 'one two [masked:password-is]', JSON.stringify(sep));
+  }
+});
+
+test('S2: the same separators arriving percent-encoded (a tab, LF, U+2028, NBSP) are found in the decoded round', () => {
+  for (const typed of ['pass%09word%20is%20Hunter2xyzQ9', 'pass%0Aword%20Hunter2xyzQ9', 'pass%E2%80%A8word%20is%20Hunter2xyzQ9', 'password%E2%80%A8Hunter2xyzQ9', 'password%C2%A0Hunter2xyzQ9', 'password%E1%9A%80Hunter2xyzQ9', 'pass%2509word%2520is%2520Hunter2xyzQ9']) {
+    const out = cleanEcho(typed);
+    assert.ok(!out.includes('Hunter2xyzQ9'), `${typed} -> ${out}`);
+  }
+});
+
+test('S2: ordinary multi-line text is left readable (the second look runs the specific detectors only)', () => {
+  assert.equal(cleanEcho('line one\nline two line three'), 'line one line two line three');
+  assert.equal(maskText('line one\nline two'), 'line one line two');
+  for (const text of PLAIN) assert.equal(cleanEcho(text.split(' ').join('\n')), text, text);
+});
+
+// ---- S3: percent-encoding deeper than the three decoding rounds ----
+const enc = (t, n) => { let x = t; for (let i = 0; i < n; i += 1) x = encodeURIComponent(x); return x; };
+
+test('S3: a value still percent-encoded after three rounds is masked WHOLE (4, 5, 6 and 10 layers), with a short secret too', () => {
+  const originals = ['password=hunter2xyz', 'password hunter2xyz', 'my password is hunter2xyz', 'pw: hunter2xyz', 'https://bob:hunter2xyz@h.example/x', 'just some harmless words', 'a b'];
+  for (const original of originals) for (const layers of [4, 5, 6, 10]) {
+    const out = cleanEcho(enc(original, layers));
+    assert.equal(out, UNDECODABLE, `${original} x${layers}`);
+    assert.ok(!out.includes('hunter2xyz'));
+  }
+  assert.equal(UNDECODABLE, '[masked:undecodable]');
+  // inside a longer value, and in the middle of plain text
+  assert.equal(cleanEcho(`see ${enc('password=hunter2xyz', 4)} here`), UNDECODABLE);
+  assert.equal(cleanEcho(`https://client.example/${enc('x y', 5)}/client.json`), UNDECODABLE);
+});
+
+test('S3: the bound is exactly three: 1, 2 and 3 layers keep their own masking; 3 layers of a plain word are not overflow', () => {
+  for (const layers of [1, 2, 3]) {
+    const out = cleanEcho(enc('password hunter2xyz', layers));
+    assert.equal(out, '[masked:password-space]', `${layers} layer(s)`);
+    assert.notEqual(cleanEcho(enc('hello world', layers)), UNDECODABLE, `${layers} layer(s) of a plain value`);
+  }
+  assert.equal(percentOverflow(percentRounds(enc('hello world', 3))), false, 'three layers decode fully');
+  assert.equal(percentOverflow(percentRounds(enc('hello world', 4))), true, 'a fourth layer is left');
+  assert.equal(percentOverflow(percentRounds('plain')), false);
+});
+
+test('S3: a literal percent sign, a malformed escape or a single escape is not overflow', () => {
+  for (const text of ['100%', '50%25', '%zz', '%E0%A4%A', 'a%20b', '%', '%%%', 'https://client.example/a%2Fb']) assert.notEqual(cleanEcho(text), UNDECODABLE, text);
+});
+
+test('S3: the response mask applies the same rule (maskResponseText and maskDeep, values AND keys)', () => {
+  assert.equal(maskResponseText(enc('password=hunter2xyz', 4)), UNDECODABLE);
+  assert.equal(maskResponseText(enc('hello world', 7)), UNDECODABLE);
+  assert.equal(maskResponseText('plain text'), 'plain text');
+  const out = maskDeep({ a: enc('password=hunter2xyz', 5), [enc('password=hunter2xyz', 4)]: 1 });
+  assert.ok(!JSON.stringify(out).includes('hunter2xyz'));
+  assert.deepEqual(Object.values(out), [UNDECODABLE, 1]);
+  assert.deepEqual(Object.keys(out), ['a', UNDECODABLE]);
+});
+
+// ---- N3: the second net decodes percent-escapes by itself ----
+test('N3: maskDeep alone masks a credential hidden under 1, 2 and 3 layers of percent-encoding (the net is not redundant)', () => {
+  for (const layers of [1, 2, 3]) {
+    const out = maskDeep({ note: enc('password=hunter2xyz', layers), deep: { list: [enc(['tok', 'en=abc123def456ghi789'].join(''), layers)] } });
+    assert.ok(!JSON.stringify(out).includes('hunter2xyz'), `${layers} layer(s)`);
+    assert.ok(!JSON.stringify(out).includes('abc123def456'), `${layers} layer(s)`);
+    assert.match(out.note, /\[masked:assignment\]/, `${layers} layer(s)`);
+  }
+  assert.equal(maskDeep({ x: 'password%3Dhunter2xyz' }).x, '[masked:assignment]');
+  assert.equal(maskDeep({ [enc('password=hunter2xyz', 2)]: 1 })['[masked:assignment]'], 1, 'keys too');
 });
