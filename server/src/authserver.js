@@ -2,10 +2,15 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { validateCimdDocument } from './validate.js';
 import { fetchDocument, FetchRefused } from './ssrf.js';
+import { cleanEcho, SPECIFIC } from './credentials.js';
 
 const CODE_TTL_MS = 60_000;
 const PENDING_TTL_MS = 5 * 60_000;
 const MAX_STORE = 50; // per workspace, for each of pending and codes
+
+// What the page is shown of a value the visitor typed (client_id, hosts, messages that quote it): credential-shaped parts are masked (userinfo, token
+// shapes, `password=`, even when percent-encoded), the rest is kept as typed. Display only: every check below runs on the raw value.
+const show = (text) => cleanEcho(text, 2048, SPECIFIC);
 
 const token = (bytes = 24) => crypto.randomBytes(bytes).toString('base64url');
 const s256 = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -60,10 +65,11 @@ export function createAuthServer({
   // Every check that ran, in order, so the page can show where a request stopped.
   async function evaluate(query) {
     const checks = [];
-    const pass = (id, detail) => checks.push({ id, ok: true, detail });
+    const pass = (id, detail) => checks.push({ id, ok: true, detail: show(detail) });
     const fail = (error, id, description, extra) => {
-      checks.push({ id, ok: false, detail: description });
-      throw new Refusal(error, id, description, { ...extra, checks });
+      const shown = show(description);
+      checks.push({ id, ok: false, detail: shown });
+      throw new Refusal(error, id, shown, { ...extra, ...(extra?.problems ? { problems: extra.problems.map((p) => ({ ...p, message: show(p.message) })) } : {}), checks });
     };
 
     if (query.response_type !== 'code') fail('unsupported_response_type', 'response_type', 'Only response_type=code is supported');
@@ -129,7 +135,7 @@ export function createAuthServer({
         pending: id,
         // The consent screen is built from the document: all of it is the client's own claim, shown as text.
         consent: {
-          client_id: result.clientId,
+          client_id: show(result.clientId),
           client_name: String(result.document.client_name ?? ''),
           client_uri: String(result.document.client_uri ?? ''),
           logo_uri: String(result.document.logo_uri ?? ''),

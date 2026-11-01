@@ -58,7 +58,15 @@ const ROUTE_METHODS = new Map([
   ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
   ['/as/.well-known/oauth-authorization-server', GET],
 ]);
-const allowedMethods = (pathname) => (/^\/api\/stories\/[^/]+$/.test(pathname) || /^\/fixtures\/[^/]+\.json$/.test(pathname) ? GET : ROUTE_METHODS.get(pathname) ?? null);
+// Express matches routes case-insensitively and ignores one trailing slash, so the 405 table does the same: GET and POST to the same spelling of a path
+// are answered by the same rule (GET /api/Gateway-Sim/info/ is 200, so POST there is a 405 with Allow, not a 404).
+const routeKey = (pathname) => (pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname).toLowerCase();
+const allowedMethods = (pathname) => {
+  const key = routeKey(pathname);
+  return /^\/api\/stories\/[^/]+$/.test(key) || /^\/fixtures\/[^/]+\.json$/.test(key) ? GET : ROUTE_METHODS.get(key) ?? null;
+};
+// An address with no file extension and outside /api, /as, /fixtures and /assets is a page (the web UI answers it); the same test serves the page and refuses a POST to it.
+const PAGE_PATH = /^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)|assets(\/|$))(?:[^/]*\/)*[^/.]*$/;
 
 // Every error is JSON with a fixed code: no message, stack or path ever reaches the client.
 export function jsonErrorHandler(err, req, res, next) {
@@ -258,12 +266,24 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
     app.use(express.static(webDist));
     // Only an address with no file extension and outside /assets/ is a page; a missing file (/assets/x.js, /favicon.ico, /robots.txt) is a JSON 404.
-    app.get(/^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)|assets(\/|$))(?:[^/]*\/)*[^/.]*$/, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
+    app.get(PAGE_PATH, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
   }
+  // Is this path one the built web UI answers on GET (a page, or a file in web/dist)? Then a POST to it is a 405, not a 404.
+  const uiPath = (pathname) => {
+    if (!fs.existsSync(path.join(webDist, 'index.html'))) return false;
+    if (PAGE_PATH.test(pathname)) return true;
+    try {
+      const decoded = decodeURIComponent(pathname);
+      if (decoded.includes('\0') || /(^|[\\/])\.\.([\\/]|$)/.test(decoded)) return false; // express.static refuses these too: never a file
+      const file = path.resolve(webDist, `.${decoded}`);
+      return file.startsWith(`${path.resolve(webDist)}${path.sep}`) && fs.statSync(file).isFile();
+    } catch { return false; }
+  };
 
-  // A known route called with the wrong method is a 405 with Allow, not a 404.
+  // A known route called with the wrong method is a 405 with Allow, not a 404. OPTIONS is a wrong method on the app's own routes (405 with Allow); under /as the
+  // router above answers it first with Express's automatic reply (200 with Allow, and no CORS headers, so a cross-origin browser preflight still fails).
   app.use((req, res, next) => {
-    const allow = allowedMethods(req.path);
+    const allow = allowedMethods(req.path) ?? (uiPath(req.path) ? GET : null);
     if (allow && !allow.includes(req.method)) return res.status(405).set('Allow', allow.join(', ')).json({ error: 'method_not_allowed' });
     return next();
   });
