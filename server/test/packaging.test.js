@@ -196,7 +196,7 @@ test('CI: GitHub-hosted runners, checkout v5, Node 26 only, build, test, doctor,
   assert.match(ci, /actions\/checkout@v5/);
   assert.match(ci, /actions\/setup-node@v5/);
   assert.doesNotMatch(ci, /self-hosted/);
-  assert.match(ci, /runs-on: ubuntu-latest/);
+  assert.match(ci, /runs-on: \$\{\{ fromJSON\(vars\.RUNS_ON \|\| '\["ubuntu-latest"\]'\) \}\}/); // hosted by default; a repo variable can point the jobs at a local runner
   assert.deepEqual([...new Set([...ci.matchAll(/node-version: (\S+)/g)].map((m) => m[1]))], ['26']);
   for (const needle of ['npm run build', 'npm test', 'npm run doctor', 'validate-content-pack.mjs', 'gitleaks detect', 'FORBIDDEN_STRINGS']) assert.ok(ci.includes(needle), needle);
   for (const job of ['build:', 'test:', 'doctor:', 'forbidden-strings:', 'gitleaks:']) assert.ok(ci.includes(`\n  ${job}`), job);
