@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,10 @@ import { createWorkspaces } from './workspace.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { renderStory, verticalList, StoryError } from './stories.js';
 import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js';
+import { evaluate, SimRefused, SCHEMA as SIM_SCHEMA, LIMITS as SIM_LIMITS, DEFAULTS as SIM_DEFAULTS, DOCUMENTS as SIM_DOCUMENTS, FAILURE_POLICIES as SIM_POLICIES, METADATA_TAGS } from './gateway-sim.js';
+import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim-claims.js';
+import { MOCK_TABLE } from './gateway-sim-table.js';
+import { maskDeep } from './mask.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
 const MAX_PASTED_BYTES = 16 * 1024;
@@ -44,6 +49,25 @@ function createRateLimiter({ now, hosted }) {
   };
 }
 
+// Known routes and the methods they take (HEAD rides along with GET). Used only to answer a wrong method with 405 and an Allow header.
+const GET = ['GET', 'HEAD'];
+const POST = ['POST'];
+const ROUTE_METHODS = new Map([
+  ['/api/health', GET], ['/api/config', GET], ['/api/stories', GET], ['/api/validate', POST], ['/api/tester/run', POST],
+  ['/api/pf/status', GET], ['/api/pf/probe', POST], ['/api/reset', POST], ['/api/gateway-sim/info', GET], ['/api/gateway-sim/mock', GET],
+  ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
+  ['/as/.well-known/oauth-authorization-server', GET],
+]);
+// Express matches routes case-insensitively and ignores one trailing slash, so the 405 table does the same: GET and POST to the same spelling of a path
+// are answered by the same rule (GET /api/Gateway-Sim/info/ is 200, so POST there is a 405 with Allow, not a 404).
+const routeKey = (pathname) => (pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname).toLowerCase();
+const allowedMethods = (pathname) => {
+  const key = routeKey(pathname);
+  return /^\/api\/stories\/[^/]+$/.test(key) || /^\/fixtures\/[^/]+\.json$/.test(key) ? GET : ROUTE_METHODS.get(key) ?? null;
+};
+// An address with no file extension and outside /api, /as, /fixtures and /assets is a page (the web UI answers it); the same test serves the page and refuses a POST to it.
+const PAGE_PATH = /^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)|assets(\/|$))(?:[^/]*\/)*[^/.]*$/;
+
 // Every error is JSON with a fixed code: no message, stack or path ever reaches the client.
 export function jsonErrorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
@@ -54,7 +78,7 @@ export function jsonErrorHandler(err, req, res, next) {
   return res.status(500).json({ error: 'server_error' });
 }
 
-export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile } = {}) {
+export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile, simulate = evaluate } = {}) {
   const app = express();
   // customer.config.json (or CUSTOMER_CONFIG): validated once at start; bad fields fall back and are reported.
   const customer = loadCustomerConfig({ file: customerFile, env });
@@ -168,6 +192,24 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     return res.json(validateCimdDocument(parsed, null));
   });
 
+  // H2 2026 tab: a local simulation of an MCP gateway that prefers CIMD client registration. No network, no PingFederate. Stateless: nothing is
+  // kept per workspace, so there is nothing to evict. Every answer passes through maskDeep.
+  app.get('/api/gateway-sim/info', (req, res) => {
+    res.set('Cache-Control', 'no-store').json({
+      schema: SIM_SCHEMA, banner: BANNER_TEXT, slide: SLIDE, tags: TAGS, claims: CLAIMS, notStated: NOT_STATED, why: WHY,
+      defaults: SIM_DEFAULTS, limits: SIM_LIMITS, documents: SIM_DOCUMENTS, failurePolicies: SIM_POLICIES, metadataTags: METADATA_TAGS,
+    });
+  });
+  app.get('/api/gateway-sim/mock', (req, res) => res.set('Cache-Control', 'no-store').json(MOCK_TABLE));
+  app.post('/api/gateway-sim/evaluate', limit('gateway-sim'), express.json({ limit: '64kb' }), (req, res) => {
+    try {
+      res.set('Cache-Control', 'no-store').json(maskDeep(simulate(req.body, { traceId: crypto.randomBytes(16).toString('hex') })));
+    } catch (error) {
+      if (!(error instanceof SimRefused)) return res.status(500).json({ error: 'server_error' });
+      return res.status(400).json({ error: error.code, ...(error.field ? { field: error.field } : {}) });
+    }
+  });
+
   // Direction 2 tester: probe the lab's own authorization server.
   app.post('/api/tester/run', limit('tester'), async (req, res) => {
     // The tester calls /as over loopback without a cookie, so it presents a one-run token that maps to this caller's workspace.
@@ -223,8 +265,28 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   // The built web UI, when it exists. Registered last so it never shadows an API route.
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
     app.use(express.static(webDist));
-    app.get(/^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)).*/, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
+    // Only an address with no file extension and outside /assets/ is a page; a missing file (/assets/x.js, /favicon.ico, /robots.txt) is a JSON 404.
+    app.get(PAGE_PATH, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
   }
+  // Is this path one the built web UI answers on GET (a page, or a file in web/dist)? Then a POST to it is a 405, not a 404.
+  const uiPath = (pathname) => {
+    if (!fs.existsSync(path.join(webDist, 'index.html'))) return false;
+    if (PAGE_PATH.test(pathname)) return true;
+    try {
+      const decoded = decodeURIComponent(pathname);
+      if (decoded.includes('\0') || /(^|[\\/])\.\.([\\/]|$)/.test(decoded)) return false; // express.static refuses these too: never a file
+      const file = path.resolve(webDist, `.${decoded}`);
+      return file.startsWith(`${path.resolve(webDist)}${path.sep}`) && fs.statSync(file).isFile();
+    } catch { return false; }
+  };
+
+  // A known route called with the wrong method is a 405 with Allow, not a 404. OPTIONS is a wrong method on the app's own routes (405 with Allow); under /as the
+  // router above answers it first with Express's automatic reply (200 with Allow, and no CORS headers, so a cross-origin browser preflight still fails).
+  app.use((req, res, next) => {
+    const allow = allowedMethods(req.path) ?? (uiPath(req.path) ? GET : null);
+    if (allow && !allow.includes(req.method)) return res.status(405).set('Allow', allow.join(', ')).json({ error: 'method_not_allowed' });
+    return next();
+  });
 
   // Last: every error is JSON, with no stack, message or path.
   app.use((req, res) => res.status(404).json({ error: 'not_found' }));

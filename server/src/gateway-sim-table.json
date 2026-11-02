@@ -1,0 +1,2168 @@
+{
+ "schema": "cimd-gateway-sim/1/mock",
+ "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+ "note": "Generated from the engine by npm run mock-table. Fixed trace id; nothing here was run against any gateway.",
+ "scenarios": [
+  {
+   "id": "both-supported",
+   "title": "Both paths available: CIMD is taken",
+   "say": "The gateway advertises CIMD and offers dynamic registration; the client presents an allowlisted document URL. The lab takes CIMD and never registers. The second and third attempts use the cache.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "refuse",
+    "attempts": 3
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "refuse",
+     "attempts": 3
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "registered",
+      "via": "cimd",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "address",
+        "title": "Is the address public?",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The host is not a private, loopback or link-local address. Nothing is resolved in the simulation: a host name is assumed to resolve publicly."
+       },
+       {
+        "id": "fetch",
+        "title": "Gateway fetches the document",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway fetches the document.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "Simulated body: 278 bytes of JSON."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET https://client.example/oauth/client.json",
+         "response": "200 application/json 278 bytes"
+        },
+        "document": {
+         "client_id": "https://client.example/oauth/client.json",
+         "client_name": "Simulated client",
+         "client_uri": "https://client.example",
+         "redirect_uris": [
+          "https://client.example/callback"
+         ],
+         "grant_types": [
+          "authorization_code"
+         ],
+         "response_types": [
+          "code"
+         ],
+         "token_endpoint_auth_method": "none"
+        }
+       },
+       {
+        "id": "validate",
+        "title": "Gateway validates the document",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The document passes the lab's own rules (ported from client.dev). The deck says the gateway validates it, not which rules."
+       },
+       {
+        "id": "cache",
+        "title": "Gateway caches the document",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway caches the document.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "Only a valid document is cached."
+         },
+         {
+          "tag": "console swagger name (schema only)",
+          "text": "The console schema names a CacheTTLHours field; its behaviour is not stated and no expiry is modelled."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "outcome": "registered",
+      "via": "cimd",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000004-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000005-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "cache",
+        "title": "Cached document used",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway already holds a valid document for this URL from an earlier attempt in this run, so it does not fetch again. The deck says the gateway caches it; how long, and when it is refreshed, is not stated and is not modelled."
+       }
+      ]
+     },
+     {
+      "n": 3,
+      "outcome": "registered",
+      "via": "cimd",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000006-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000007-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "cache",
+        "title": "Cached document used",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway already holds a valid document for this URL from an earlier attempt in this run, so it does not fetch again. The deck says the gateway caches it; how long, and when it is refreshed, is not stated and is not modelled."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "registered",
+     "via": "cimd",
+     "reason": null,
+     "fellBackFrom": null,
+     "fetches": 1,
+     "cacheHits": 2,
+     "dcrRecords": 0,
+     "cacheEntries": 1,
+     "validations": 1
+    }
+   }
+  },
+  {
+   "id": "no-document-url",
+   "title": "Client has no document URL: dynamic registration",
+   "say": "The client cannot present a document URL, so it registers dynamically. Three fresh connections leave three records on the gateway.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": false,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "refuse",
+    "attempts": 3
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": false,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "refuse",
+     "attempts": 3
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": false,
+     "dcrAvailable": true,
+     "path": "dcr"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The CIMD path is not available (the client does not present a document URL), so the client registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server; the rule for when it is used is the lab's reading."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-1 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-1"
+        }
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The CIMD path is not available (the client does not present a document URL), so the client registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server; the rule for when it is used is the lab's reading."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-2 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000004-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-2"
+        }
+       }
+      ]
+     },
+     {
+      "n": 3,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000005-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The CIMD path is not available (the client does not present a document URL), so the client registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server; the rule for when it is used is the lab's reading."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-3 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000006-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-3"
+        }
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "registered",
+     "via": "dcr",
+     "reason": null,
+     "fellBackFrom": null,
+     "fetches": 0,
+     "cacheHits": 0,
+     "dcrRecords": 3,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  },
+  {
+   "id": "gateway-no-cimd",
+   "title": "Gateway does not advertise CIMD: dynamic registration",
+   "say": "The client could use a document URL, but the gateway does not advertise CIMD, so the client registers dynamically.",
+   "input": {
+    "gatewayAdvertisesCimd": false,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "refuse",
+    "attempts": 3
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": false,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "refuse",
+     "attempts": 3
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": false,
+     "dcrAvailable": true,
+     "path": "dcr"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The CIMD path is not available (the gateway does not advertise CIMD), so the client registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server; the rule for when it is used is the lab's reading."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-1 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-1"
+        }
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The CIMD path is not available (the gateway does not advertise CIMD), so the client registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server; the rule for when it is used is the lab's reading."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-2 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000004-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-2"
+        }
+       }
+      ]
+     },
+     {
+      "n": 3,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000005-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The CIMD path is not available (the gateway does not advertise CIMD), so the client registers dynamically. The deck lists dynamic client registration as part of the gateway's authorization server; the rule for when it is used is the lab's reading."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-3 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000006-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-3"
+        }
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "registered",
+     "via": "dcr",
+     "reason": null,
+     "fellBackFrom": null,
+     "fetches": 0,
+     "cacheHits": 0,
+     "dcrRecords": 3,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  },
+  {
+   "id": "not-allowlisted-refuse",
+   "title": "URL not on the allowlist, policy refuse",
+   "say": "The CIMD path was chosen, but the URL is not on the tenant allowlist. Nothing is fetched. The lab's failure policy is refuse.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://other.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "refuse",
+    "attempts": 3
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://other.example/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "refuse",
+     "attempts": 3
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "refused",
+      "via": null,
+      "reason": "not_allowlisted",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": false,
+        "tag": "lab reading",
+        "detail": "No: the lab does not fetch a document the tenant has not allowlisted (its reading of \"a document URL the tenant has allowlisted\"). The lab compares the whole URL text exactly."
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "outcome": "refused",
+      "via": null,
+      "reason": "not_allowlisted",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000004-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": false,
+        "tag": "lab reading",
+        "detail": "No: the lab does not fetch a document the tenant has not allowlisted (its reading of \"a document URL the tenant has allowlisted\"). The lab compares the whole URL text exactly."
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     },
+     {
+      "n": 3,
+      "outcome": "refused",
+      "via": null,
+      "reason": "not_allowlisted",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000005-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000006-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": false,
+        "tag": "lab reading",
+        "detail": "No: the lab does not fetch a document the tenant has not allowlisted (its reading of \"a document URL the tenant has allowlisted\"). The lab compares the whole URL text exactly."
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "refused",
+     "via": null,
+     "reason": "not_allowlisted",
+     "fellBackFrom": null,
+     "fetches": 0,
+     "cacheHits": 0,
+     "dcrRecords": 0,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  },
+  {
+   "id": "not-allowlisted-fallback",
+   "title": "URL not on the allowlist, policy fall back",
+   "say": "Same refusal at the allowlist, but the lab's failure policy falls back to dynamic registration. The deck does not say the gateway does this.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://other.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "fall_back_to_dcr",
+    "attempts": 3
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://other.example/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "fall_back_to_dcr",
+     "attempts": 3
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "fellBackFrom": "not_allowlisted",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": false,
+        "tag": "lab reading",
+        "detail": "No: the lab does not fetch a document the tenant has not allowlisted (its reading of \"a document URL the tenant has allowlisted\"). The lab compares the whole URL text exactly."
+       },
+       {
+        "id": "fallback",
+        "title": "Fall back to dynamic registration",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"fall back to dynamic registration\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-1 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-1"
+        }
+       }
+      ]
+     },
+     {
+      "n": 2,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "fellBackFrom": "not_allowlisted",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000004-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000005-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": false,
+        "tag": "lab reading",
+        "detail": "No: the lab does not fetch a document the tenant has not allowlisted (its reading of \"a document URL the tenant has allowlisted\"). The lab compares the whole URL text exactly."
+       },
+       {
+        "id": "fallback",
+        "title": "Fall back to dynamic registration",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"fall back to dynamic registration\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-2 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000006-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-2"
+        }
+       }
+      ]
+     },
+     {
+      "n": 3,
+      "outcome": "registered",
+      "via": "dcr",
+      "reason": null,
+      "fellBackFrom": "not_allowlisted",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000007-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000008-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": false,
+        "tag": "lab reading",
+        "detail": "No: the lab does not fetch a document the tenant has not allowlisted (its reading of \"a document URL the tenant has allowlisted\"). The lab compares the whole URL text exactly."
+       },
+       {
+        "id": "fallback",
+        "title": "Fall back to dynamic registration",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"fall back to dynamic registration\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       },
+       {
+        "id": "dcr",
+        "title": "Dynamic client registration",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway's authorization server also offers dynamic client registration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "In the lab each fresh connection registers a new client and the gateway keeps one record per registration."
+         },
+         {
+          "tag": "lab-invented",
+          "text": "Issued: dcr-client-3 (a mock-issued label, not a real credential)."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000009-01",
+         "request": "POST https://gateway.example/mcp/register",
+         "response": "201 client_id dcr-client-3"
+        }
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "registered",
+     "via": "dcr",
+     "reason": null,
+     "fellBackFrom": "not_allowlisted",
+     "fetches": 0,
+     "cacheHits": 0,
+     "dcrRecords": 3,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  },
+  {
+   "id": "id-mismatch",
+   "title": "Document names a different client_id",
+   "say": "The URL is allowlisted and fetched, but the document's client_id is another URL, so validation fails.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "client_id_mismatch",
+    "onCimdFailure": "refuse",
+    "attempts": 1
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "client_id_mismatch",
+     "onCimdFailure": "refuse",
+     "attempts": 1
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "refused",
+      "via": null,
+      "reason": "document_invalid",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "address",
+        "title": "Is the address public?",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The host is not a private, loopback or link-local address. Nothing is resolved in the simulation: a host name is assumed to resolve publicly."
+       },
+       {
+        "id": "fetch",
+        "title": "Gateway fetches the document",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway fetches the document.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "Simulated body: 285 bytes of JSON."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET https://client.example/oauth/client.json",
+         "response": "200 application/json 285 bytes"
+        },
+        "document": {
+         "client_id": "https://client.example/some-other-document.json",
+         "client_name": "Simulated client",
+         "client_uri": "https://client.example",
+         "redirect_uris": [
+          "https://client.example/callback"
+         ],
+         "grant_types": [
+          "authorization_code"
+         ],
+         "response_types": [
+          "code"
+         ],
+         "token_endpoint_auth_method": "none"
+        }
+       },
+       {
+        "id": "validate",
+        "title": "Gateway validates the document",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The document fails the lab's own rules: client_id must match the URL the document was fetched from. The deck says the gateway validates it, not which rules."
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "refused",
+     "via": null,
+     "reason": "document_invalid",
+     "fellBackFrom": null,
+     "fetches": 1,
+     "cacheHits": 0,
+     "dcrRecords": 0,
+     "cacheEntries": 0,
+     "validations": 1
+    }
+   }
+  },
+  {
+   "id": "shared-secret",
+   "title": "Document asks for a shared secret",
+   "say": "The document asks for a shared-secret authentication method, which a public document cannot hold, so validation fails.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "shared_secret",
+    "onCimdFailure": "refuse",
+    "attempts": 1
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "shared_secret",
+     "onCimdFailure": "refuse",
+     "attempts": 1
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "refused",
+      "via": null,
+      "reason": "document_invalid",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "address",
+        "title": "Is the address public?",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The host is not a private, loopback or link-local address. Nothing is resolved in the simulation: a host name is assumed to resolve publicly."
+       },
+       {
+        "id": "fetch",
+        "title": "Gateway fetches the document",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway fetches the document.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "Simulated body: 293 bytes of JSON."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET https://client.example/oauth/client.json",
+         "response": "200 application/json 293 bytes"
+        },
+        "document": {
+         "client_id": "https://client.example/oauth/client.json",
+         "client_name": "Simulated client",
+         "client_uri": "https://client.example",
+         "redirect_uris": [
+          "https://client.example/callback"
+         ],
+         "grant_types": [
+          "authorization_code"
+         ],
+         "response_types": [
+          "code"
+         ],
+         "token_endpoint_auth_method": "client_secret_basic"
+        }
+       },
+       {
+        "id": "validate",
+        "title": "Gateway validates the document",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The document fails the lab's own rules: client_secret_basic needs a shared secret, which a public document cannot hold. The deck says the gateway validates it, not which rules."
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "refused",
+     "via": null,
+     "reason": "document_invalid",
+     "fellBackFrom": null,
+     "fetches": 1,
+     "cacheHits": 0,
+     "dcrRecords": 0,
+     "cacheEntries": 0,
+     "validations": 1
+    }
+   }
+  },
+  {
+   "id": "unreachable",
+   "title": "Document cannot be fetched",
+   "say": "The URL is allowlisted but the simulated web does not answer, so the fetch fails.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "unreachable",
+    "onCimdFailure": "refuse",
+    "attempts": 1
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "unreachable",
+     "onCimdFailure": "refuse",
+     "attempts": 1
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "refused",
+      "via": null,
+      "reason": "fetch_failed",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://client.example/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://client.example/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "address",
+        "title": "Is the address public?",
+        "ok": true,
+        "tag": "lab-invented",
+        "detail": "The host is not a private, loopback or link-local address. Nothing is resolved in the simulation: a host name is assumed to resolve publicly."
+       },
+       {
+        "id": "fetch",
+        "title": "Gateway fetches the document",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The simulated web answers: no answer. The gateway cannot use that, so the fetch fails. (Failure handling inside the gateway is not stated in the deck.)",
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000003-01",
+         "request": "GET https://client.example/oauth/client.json",
+         "response": "no answer"
+        }
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "refused",
+     "via": null,
+     "reason": "fetch_failed",
+     "fellBackFrom": null,
+     "fetches": 1,
+     "cacheHits": 0,
+     "dcrRecords": 0,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  },
+  {
+   "id": "private-address",
+   "title": "Allowlisted URL points at a private address",
+   "say": "The lab refuses to fetch a private address even when the tenant listed it. This rule is the lab's own.",
+   "input": {
+    "gatewayAdvertisesCimd": true,
+    "gatewayOffersDcr": true,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://10.0.0.5/oauth/client.json"
+    ],
+    "clientIdUrl": "https://10.0.0.5/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "refuse",
+    "attempts": 1
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": true,
+     "gatewayOffersDcr": true,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://10.0.0.5/oauth/client.json",
+     "allowlist": [
+      "https://10.0.0.5/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "refuse",
+     "attempts": 1
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ],
+     "client_id_metadata_document_supported": true,
+     "registration_endpoint": "https://gateway.example/mcp/register"
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": true,
+     "dcrAvailable": true,
+     "path": "cimd"
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "refused",
+      "via": null,
+      "reason": "private_address",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported, client_id_metadata_document_supported, registration_endpoint"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "The gateway advertises CIMD and the client presents a document URL, so the CIMD path is taken and dynamic registration is not used. The deck states that the MCP specification prefers CIMD over dynamic registration; the lab reads that as this choice."
+       },
+       {
+        "id": "present",
+        "title": "Client presents a document URL as its client_id",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says a client identifies itself by a document URL the tenant has allowlisted.",
+        "notes": [
+         {
+          "tag": "lab-invented",
+          "text": "The simulated client presents client_id: https://10.0.0.5/oauth/client.json"
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000002-01",
+         "request": "GET https://gateway.example/mcp/authorize?client_id=https://10.0.0.5/oauth/client.json",
+         "response": "checking"
+        }
+       },
+       {
+        "id": "allowlist",
+        "title": "Is the URL on the tenant allowlist?",
+        "ok": true,
+        "tag": "lab reading",
+        "detail": "Yes: the URL equals an allowlist entry exactly (the lab compares the whole URL text; the deck says \"a document URL the tenant has allowlisted\" and no more)."
+       },
+       {
+        "id": "address",
+        "title": "Is the address public?",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The host is a private, loopback or link-local address. The lab refuses to fetch it (the lab's own SSRF rule; the deck does not say what the gateway refuses)."
+       },
+       {
+        "id": "refuse",
+        "title": "Registration refused",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "The visitor chose \"refuse\". The deck does not say what the gateway does when the CIMD path fails; this is the lab's own option."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "refused",
+     "via": null,
+     "reason": "private_address",
+     "fellBackFrom": null,
+     "fetches": 0,
+     "cacheHits": 0,
+     "dcrRecords": 0,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  },
+  {
+   "id": "no-path",
+   "title": "Nothing available: refused",
+   "say": "The gateway advertises no CIMD and offers no dynamic registration, so there is no registration path.",
+   "input": {
+    "gatewayAdvertisesCimd": false,
+    "gatewayOffersDcr": false,
+    "clientSupportsCimd": true,
+    "clientSupportsDcr": true,
+    "allowlist": [
+     "https://client.example/oauth/client.json"
+    ],
+    "clientIdUrl": "https://client.example/oauth/client.json",
+    "document": "good",
+    "onCimdFailure": "refuse",
+    "attempts": 1
+   },
+   "result": {
+    "schema": "cimd-gateway-sim/1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "input": {
+     "gatewayAdvertisesCimd": false,
+     "gatewayOffersDcr": false,
+     "clientSupportsCimd": true,
+     "clientSupportsDcr": true,
+     "clientIdUrl": "https://client.example/oauth/client.json",
+     "allowlist": [
+      "https://client.example/oauth/client.json"
+     ],
+     "document": "good",
+     "onCimdFailure": "refuse",
+     "attempts": 1
+    },
+    "metadata": {
+     "issuer": "https://gateway.example/mcp",
+     "authorization_endpoint": "https://gateway.example/mcp/authorize",
+     "token_endpoint": "https://gateway.example/mcp/token",
+     "code_challenge_methods_supported": [
+      "S256"
+     ]
+    },
+    "metadataTags": {
+     "issuer": "lab-invented",
+     "authorization_endpoint": "lab-invented",
+     "token_endpoint": "lab-invented",
+     "code_challenge_methods_supported": "lab reading",
+     "client_id_metadata_document_supported": "lab reading",
+     "registration_endpoint": "lab reading"
+    },
+    "preference": {
+     "cimdAvailable": false,
+     "dcrAvailable": false,
+     "path": null
+    },
+    "attempts": [
+     {
+      "n": 1,
+      "outcome": "refused",
+      "via": null,
+      "reason": "no_registration_path",
+      "steps": [
+       {
+        "id": "discovery",
+        "title": "Client reads the gateway discovery metadata",
+        "ok": true,
+        "tag": "deck claim",
+        "detail": "The deck says the gateway advertises CIMD support in its discovery metadata and publishes discovery metadata so compliant clients connect without custom configuration.",
+        "notes": [
+         {
+          "tag": "lab reading",
+          "text": "The well-known path and the field names in the hop below come from RFC 8414 and the CIMD draft (each field is tagged in the result). The deck says only \"discovery metadata\"."
+         }
+        ],
+        "hop": {
+         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000001-01",
+         "request": "GET /.well-known/oauth-authorization-server",
+         "response": "200 issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported"
+        }
+       },
+       {
+        "id": "choose",
+        "title": "Choose a registration path",
+        "ok": false,
+        "tag": "lab-invented",
+        "detail": "No registration path is available: the gateway does not advertise CIMD; the gateway does not offer dynamic client registration."
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "outcome": "refused",
+     "via": null,
+     "reason": "no_registration_path",
+     "fellBackFrom": null,
+     "fetches": 0,
+     "cacheHits": 0,
+     "dcrRecords": 0,
+     "cacheEntries": 0,
+     "validations": 0
+    }
+   }
+  }
+ ]
+}
