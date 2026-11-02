@@ -14,7 +14,7 @@ export default function Stories({ vertical, setVertical }) {
   return (
     <div className="view stories">
       <h2>Stories</h2>
-      <p>The same nine beats as the talk track, retold for a made-up company. Every name here is fictional.</p>
+      <p>The same ten beats as the talk track, retold for a made-up company. Every name here is fictional.</p>
       <fieldset className="story-pick">
         <legend>Vertical</legend>
         {verticals.map((v) => (

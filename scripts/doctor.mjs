@@ -4,9 +4,12 @@ import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { discoverPf, pfSettings, PfRefused } from '../server/src/pf.js';
+import { buildMockTable } from '../server/src/gateway-sim-scenarios.js';
+import { evaluate, DEFAULTS } from '../server/src/gateway-sim.js';
+import { MOCK_TABLE } from '../server/src/gateway-sim-table.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 5250;
+const PORT = Number(process.env.PORT) || 5250;
 let failures = 0;
 const line = (ok, text) => { if (!ok) failures += 1; console.log(`${ok ? 'OK  ' : 'FAIL'} ${text}`); };
 const note = (text) => console.log(`INFO ${text}`);
@@ -23,7 +26,7 @@ function loadDotEnv() {
 }
 
 const major = Number(process.versions.node.split('.')[0]);
-line(major >= 20, `Node ${process.versions.node} (needs 20 or newer)`);
+line(major >= 26, `Node ${process.versions.node} (needs 26 or newer)`);
 
 const free = await new Promise((resolve) => {
   const server = net.createServer();
@@ -39,6 +42,14 @@ else {
     ours = body?.schema === 'demo-health/1' && body?.demo?.id === 'cimd-lab';
   } catch { /* not ours */ }
   line(ours, ours ? `Port ${PORT} is serving CIMD Lab` : `Port ${PORT} is in use by something else`);
+}
+
+// H2 2026 tab: the local simulation runs in this process (no network), and the committed Mock table is what the engine gives now.
+{
+  const run = evaluate(DEFAULTS, { traceId: '4bf92f3577b34da6a3ce929d0e0e4736' });
+  const s = run.summary;
+  line(s.outcome === 'registered' && s.via === 'cimd' && s.fetches === 1 && s.cacheHits === DEFAULTS.attempts - 1 && s.dcrRecords === 0, 'H2 2026 simulation: the default scenario registers through CIMD with one fetch and the rest from the cache');
+  line(JSON.stringify(MOCK_TABLE) === JSON.stringify(buildMockTable()), 'H2 2026 Mock table matches the engine (npm run mock-table rewrites it)');
 }
 
 line(fs.existsSync(path.join(root, 'web/dist/index.html')), 'Web UI built (npm run build); without it only the API is served');

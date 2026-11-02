@@ -45,7 +45,7 @@ test('every pack renders for every vertical with no braces left, with the defaul
   for (const config of [DEFAULTS, custom]) {
     for (const id of VERTICALS) {
       const story = renderStory(id, config);
-      assert.equal(story.beats.length, 9);
+      assert.equal(story.beats.length, 10);
       assert.doesNotMatch(JSON.stringify(story), /\{\{|\}\}|undefined/);
     }
   }
@@ -116,12 +116,12 @@ test('API: list, render per vertical, unknown vertical is 404, customer cast is 
   } finally { await lab.close(); fs.rmSync(path.dirname(file), { recursive: true, force: true }); }
 });
 
-test('airline pack: its own fictional cast, all nine beats, no raw tokens, a different story from travel', () => {
+test('airline pack: its own fictional cast, all ten beats, no raw tokens, a different story from travel', () => {
   const airline = renderStory('airline');
   assert.equal(airline.label, 'Airline');
   assert.equal(airline.cast.company, 'Aurelia Airways');
   assert.match(airline.cast.clientUrl, /^https:\/\/[a-z0-9.-]+\.example\//);
-  assert.equal(airline.beats.length, 9);
+  assert.equal(airline.beats.length, 10);
   for (const beat of airline.beats) {
     assert.ok(beat.story.length > 60, beat.id);
     assert.doesNotMatch(`${beat.title} ${beat.story} ${beat.points.join(' ')}`, /\{\{|\}\}/, beat.id);
@@ -136,4 +136,20 @@ test('airline pack: its own fictional cast, all nine beats, no raw tokens, a dif
 test('airline is a valid customer vertical and an unregistered pack is refused', () => {
   assert.equal(validateConfig({ vertical: 'airline' }).config.vertical, 'airline');
   assert.throws(() => renderStory('airlines'), StoryError);
+});
+
+test('the H2 2026 beat: tagged as a Ping release claim, UNVERIFIED on our tenant, in the common points, in every vertical and in the talk track', () => {
+  const beat = STORIES.common.beats.find((b) => b.id === 'gateway-prefers-cimd');
+  assert.equal(STORIES.common.beats.indexOf(beat), 8, 'ninth of ten, just before the close');
+  assert.equal(STORIES.common.beats.length, 10);
+  assert.equal(beat.points.length, 5);
+  assert.match(beat.points[0], /Ping release claim, UNVERIFIED on our tenant/);
+  assert.match(beat.points[1], /^Deck claim \(slide 36\)/);
+  assert.match(beat.points[2], /^Lab reading:.*Lab-invented:/);
+  assert.match(beat.points[4], /Challenge:.*Technical:.*Business:/);
+  assert.match(beat.points[4], /Ping claim, UNVERIFIED on our tenant/);
+  for (const id of VERTICALS) assert.match(STORIES.packs[id].stories['gateway-prefers-cimd'], /UNVERIFIED on our tenant/, id);
+  const md = fs.readFileSync(path.join(root, 'docs/talk-track.md'), 'utf8');
+  assert.match(md, /^## 9\. H2 2026: an MCP gateway that prefers CIMD/m);
+  assert.match(md, /^## 10\. Close/m);
 });
