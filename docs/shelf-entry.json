@@ -10,5 +10,8 @@
   "port": 5250,
   "notes": "Host-run: npm install && npm run build && npm start (port 5250, loopback only). Or: docker compose up --build -d (publishes 127.0.0.1:5250 only). Edit composeFile to this checkout's absolute path. No catalog row matches, so there is no catalogId. Direction 1 needs PF_BASE_URL (real PingFederate). Hosted copy on the SE cluster at mockUrl (not mock-only: direction 1 uses real PingFederate, owner exception 2026-10-28).",
   "mockUrl": "https://cimd-lab.ai-demo.ping-devops.com",
-  "catalogId": "D36"
+  "catalogId": "D36",
+  "pingProducts": [
+    "pingfederate"
+  ]
 }
