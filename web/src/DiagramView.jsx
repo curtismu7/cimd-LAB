@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, Background, Controls, Handle, Position, applyNodeChanges, MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { loadDiagram } from './diagrams/index.js';
@@ -52,6 +52,19 @@ export default function DiagramView({ id, resetKey = 0, presenter = false }) {
   const diagram = useMemo(() => loadDiagram(id), [id]);
   const { positions, move, reset } = usePositions(diagram);
   const [s, dispatch] = useStepper(diagram.steps.length);
+  // fitView runs once on mount, against the canvas width at that moment. When the layout shifts afterwards
+  // (a scrollbar appears, the window narrows, a panel above grows) the fitted zoom no longer fits and boxes
+  // drift off the right edge. Re-fit whenever the canvas is resized.
+  const canvasRef = useRef(null);
+  const fitRef = useRef(null);
+  const onInit = useCallback((instance) => { fitRef.current = () => instance.fitView({ padding: 0.08, duration: 0 }); fitRef.current(); }, []);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => fitRef.current?.());
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   const doReset = useCallback(() => { reset(); dispatch({ type: 'stop' }); }, [reset, dispatch]);
   useEffect(() => { if (resetKey) doReset(); }, [resetKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -92,12 +105,13 @@ export default function DiagramView({ id, resetKey = 0, presenter = false }) {
           </select>
         </label>
       </div>
-      <div className="dg-canvas" data-testid="diagram-canvas">
+      <div className="dg-canvas" data-testid="diagram-canvas" ref={canvasRef}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
+          onInit={onInit}
           nodesDraggable
           nodesConnectable={false}
           fitView
