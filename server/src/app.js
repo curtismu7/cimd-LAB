@@ -85,9 +85,12 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   const customer = loadCustomerConfig({ file: customerFile, env });
   app.disable('x-powered-by');
   const hosted = env.MODE === 'hosted';
+  // Local domain names (family standard): LAB_ALLOWED_HOSTS adds hosts the lab answers to besides loopback.
+  const localExtra = String(env.LAB_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   const publicHost = hosted ? (env.PUBLIC_HOST || '') : '';
   const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
   if (publicHost) allowedHosts.add(publicHost);
+  for (const h of localExtra) allowedHosts.add(h);
   // The lab calls itself (tester, fixtures) over loopback; the public origin is only an extra same-origin for browser writes.
   const origin = `http://127.0.0.1:${port}`;
   const publicOrigin = publicHost ? `https://${publicHost}` : null;
