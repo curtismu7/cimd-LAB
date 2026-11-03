@@ -4,35 +4,190 @@
   "title": "PingFederate as the server: a URL becomes a client",
   "lede": "The client has no registration. It presents an https URL as its client_id and PingFederate fetches the document behind it, if a CIMD policy matches that URL.",
   "groups": {
-    "client": { "label": "The client", "color": "dark" },
-    "pf": { "label": "Real PingFederate", "color": "red" },
-    "web": { "label": "The public web", "color": "blue" }
+    "client": {
+      "label": "The client",
+      "color": "dark"
+    },
+    "pf": {
+      "label": "Real PingFederate",
+      "color": "red"
+    },
+    "web": {
+      "label": "The public web",
+      "color": "blue"
+    }
   },
   "nodes": [
-    { "id": "client", "group": "client", "label": "Client", "sub": ["This lab, or client.dev's public example", "client_id = an https URL"], "x": 0, "y": 140 },
-    { "id": "authz", "group": "pf", "label": "Authorization endpoint", "sub": ["Receives the request with the URL as client_id"], "x": 320, "y": 140 },
-    { "id": "policy", "group": "pf", "label": "CIMD policy match", "sub": ["One metadata URL per policy", "Enabled policy must match"], "x": 640, "y": 140 },
-    { "id": "doc", "group": "web", "label": "Metadata document", "sub": ["JSON at the client_id URL"], "x": 960, "y": 20 },
-    { "id": "validate", "group": "pf", "label": "Validate the document", "sub": ["client_id equals the URL", "redirect_uris, no shared secret"], "x": 960, "y": 260 },
-    { "id": "ephemeral", "group": "pf", "label": "Ephemeral client", "sub": ["Created from the document, not registered by anyone"], "x": 640, "y": 380 },
-    { "id": "signin", "group": "pf", "label": "Sign-in", "sub": ["The user authenticates"], "x": 320, "y": 380 },
-    { "id": "code", "group": "client", "label": "Authorization code", "sub": ["Redirected to a listed redirect_uri"], "x": 0, "y": 380 }
+    {
+      "id": "client",
+      "group": "client",
+      "label": "Client",
+      "sub": [
+        "This lab, or client.dev's public example",
+        "client_id = an https URL"
+      ],
+      "x": 0,
+      "y": 140
+    },
+    {
+      "id": "authz",
+      "group": "pf",
+      "label": "Authorization endpoint",
+      "sub": [
+        "Receives the request with the URL as client_id"
+      ],
+      "x": 320,
+      "y": 140
+    },
+    {
+      "id": "policy",
+      "group": "pf",
+      "label": "CIMD policy match",
+      "sub": [
+        "One metadata URL per policy",
+        "Enabled policy must match"
+      ],
+      "x": 640,
+      "y": 140
+    },
+    {
+      "id": "doc",
+      "group": "web",
+      "label": "Metadata document",
+      "sub": [
+        "JSON at the client_id URL"
+      ],
+      "x": 960,
+      "y": 20
+    },
+    {
+      "id": "validate",
+      "group": "pf",
+      "label": "Validate the document",
+      "sub": [
+        "client_id equals the URL",
+        "redirect_uris, no shared secret"
+      ],
+      "x": 960,
+      "y": 260
+    },
+    {
+      "id": "ephemeral",
+      "group": "pf",
+      "label": "Ephemeral client",
+      "sub": [
+        "Created from the document, not registered by anyone"
+      ],
+      "x": 640,
+      "y": 380
+    },
+    {
+      "id": "signin",
+      "group": "pf",
+      "label": "Sign-in",
+      "sub": [
+        "The user authenticates"
+      ],
+      "x": 320,
+      "y": 380
+    },
+    {
+      "id": "code",
+      "group": "client",
+      "label": "Authorization code",
+      "sub": [
+        "Redirected to a listed redirect_uri"
+      ],
+      "x": 0,
+      "y": 380
+    }
   ],
   "edges": [
-    { "source": "client", "target": "authz", "label": "1 authorize request" },
-    { "source": "authz", "target": "policy", "label": "2 match the URL" },
-    { "source": "policy", "target": "doc", "label": "3 fetch" },
-    { "source": "doc", "target": "validate", "label": "4 JSON back" },
-    { "source": "validate", "target": "ephemeral", "label": "5 valid: create" },
-    { "source": "ephemeral", "target": "signin", "label": "6 sign in" },
-    { "source": "signin", "target": "code", "label": "7 code" },
-    { "source": "policy", "target": "client", "label": "no match: HTTP 400" }
+    {
+      "source": "client",
+      "target": "authz",
+      "label": "1 authorize request",
+      "color": "blue"
+    },
+    {
+      "source": "authz",
+      "target": "policy",
+      "label": "2 match the URL"
+    },
+    {
+      "source": "policy",
+      "target": "doc",
+      "label": "3 fetch",
+      "color": "blue"
+    },
+    {
+      "source": "doc",
+      "target": "validate",
+      "label": "4 JSON back"
+    },
+    {
+      "source": "validate",
+      "target": "ephemeral",
+      "label": "5 valid: create"
+    },
+    {
+      "source": "ephemeral",
+      "target": "signin",
+      "label": "6 sign in",
+      "color": "green"
+    },
+    {
+      "source": "signin",
+      "target": "code",
+      "label": "7 code",
+      "color": "green"
+    },
+    {
+      "source": "policy",
+      "target": "client",
+      "label": "no match: HTTP 400"
+    }
   ],
   "steps": [
-    { "title": "The client presents a URL", "what": "The authorize request carries an https URL as client_id. Nothing was registered beforehand.", "edges": [0, 1] },
-    { "title": "PingFederate fetches the document", "what": "If an enabled CIMD policy matches the URL, PingFederate fetches the JSON behind it.", "edges": [2, 3] },
-    { "title": "It validates and creates a client", "what": "The document is checked and an ephemeral client is created from it for this request.", "edges": [4] },
-    { "title": "Sign-in, then a code", "what": "Accepted means PingFederate moved on to sign-in. The code goes to a redirect_uri the document lists.", "edges": [5, 6] },
-    { "title": "When no policy matches", "what": "PingFederate answers HTTP 400 and the document is never fetched. Fix the policy, not the client.", "edges": [0, 1, 7] }
+    {
+      "title": "The client presents a URL",
+      "what": "The authorize request carries an https URL as client_id. Nothing was registered beforehand.",
+      "edges": [
+        0,
+        1
+      ]
+    },
+    {
+      "title": "PingFederate fetches the document",
+      "what": "If an enabled CIMD policy matches the URL, PingFederate fetches the JSON behind it.",
+      "edges": [
+        2,
+        3
+      ]
+    },
+    {
+      "title": "It validates and creates a client",
+      "what": "The document is checked and an ephemeral client is created from it for this request.",
+      "edges": [
+        4
+      ]
+    },
+    {
+      "title": "Sign-in, then a code",
+      "what": "Accepted means PingFederate moved on to sign-in. The code goes to a redirect_uri the document lists.",
+      "edges": [
+        5,
+        6
+      ]
+    },
+    {
+      "title": "When no policy matches",
+      "what": "PingFederate answers HTTP 400 and the document is never fetched. Fix the policy, not the client.",
+      "edges": [
+        0,
+        1,
+        7
+      ]
+    }
   ]
 }
