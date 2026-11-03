@@ -28,6 +28,7 @@ jobs:
           node-version: 26
       - run: npm ci
       - run: npm test
+      - run: bash scripts/check-ui-standard.sh
       - name: SE manifests render (dry run, no cluster)
         run: NAMESPACE=ci IMAGE=registry.invalid/cimd-lab:ci SE_HOST=cimd-lab.invalid PF_BASE_URL=https://pf.invalid DRY_RUN=1 scripts/deploy-se.sh > /dev/null
 
