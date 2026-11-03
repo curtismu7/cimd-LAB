@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import ModeToggle from './ModeToggle.jsx';
 import Learn from './views/Learn.jsx';
 import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
@@ -35,12 +36,16 @@ export default function App() {
   const [resetKey, setResetKey] = useState(0);
   const [resetNote, setResetNote] = useState('');
   const [hosted, setHosted] = useState(false);
+  const [info, setInfo] = useState(null);
+  const [realAuth, setRealAuth] = useState({ checked: false, available: false, subject: null, problem: null });
   const [customer, setCustomer] = useState({ name: 'CIMD Lab', tagline: '' });
   const [vertical, setVertical] = useState(null);
   const tabRefs = useRef({});
 
   useEffect(() => {
     let live = true;
+    api.info().then((r) => { if (live && r.ok) setInfo(r.data); });
+    api.realAuthConfig().then((r) => { if (live) setRealAuth((x) => ({ ...x, checked: true, available: r.ok && r.data?.available === true })); });
     api.config().then((r) => {
       if (!live || !r.ok) return;
       if (r.data?.mode === 'hosted') setHosted(true);
@@ -97,6 +102,18 @@ export default function App() {
     setTab(TABS[target].id);
     tabRefs.current[TABS[target].id]?.focus();
   };
+  const changeMode = async (next) => {
+    const r = await api.setMode(next);
+    if (r.ok) setInfo((x) => ({ ...x, source: r.data?.source ?? next, mode: r.data?.source ?? next }));
+    else setRealAuth((x) => ({ ...x, problem: r.data?.message || 'the switch was refused' }));
+  };
+  const realSignIn = async (username, password) => {
+    const start = await api.realAuthStart();
+    if (!start.ok) return setRealAuth((x) => ({ ...x, problem: start.data?.message || 'PingFederate did not open a flow' }));
+    const done = await api.realAuthCredentials({ username, password });
+    setRealAuth((x) => ({ ...x, problem: done.ok ? null : (done.data?.message || 'the sign-in was refused'), subject: done.ok ? (done.data?.subject ?? null) : null }));
+  };
+
   const Active = TABS.find((t) => t.id === tab).View;
 
   return (
@@ -105,6 +122,7 @@ export default function App() {
       <header className="bar">
         <h1>{customer.name}</h1>
         <span className="mode" data-testid="mode">{tab === 'h2' ? MODE_H2 : MODE_PF}</span>
+        {info && !hosted && tab !== 'h2' && <ModeToggle mode={info.source} realAvailable={info.realAvailable !== false} onChange={changeMode} />}
         {!presenter && (
           <div className="actions">
             <button type="button" onClick={reset}>Reset</button>
@@ -114,6 +132,21 @@ export default function App() {
         <button type="button" aria-pressed={presenter} aria-keyshortcuts="P Escape" title="Keys: P toggles, Esc leaves" onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
         {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
       </header>
+      {!presenter && info && info.source === 'real' && realAuth.checked && realAuth.available && !realAuth.subject && (
+        <section className="real-signin" aria-labelledby="real-signin-h">
+          <h2 id="real-signin-h">Sign in with PingFederate</h2>
+          <p>A real pi.flow login runs server-side against the PingFederate named by PF_BASE_URL. The lab shows the subject and keeps no token.</p>
+          <form onSubmit={(e) => { e.preventDefault(); realSignIn(e.target.username.value, e.target.password.value); }} aria-label="Real sign-in">
+            <label className="inline">Username<input name="username" type="text" autoComplete="username" required maxLength={256} /></label>
+            <label className="inline">Password<input name="password" type="password" autoComplete="current-password" required maxLength={1024} /></label>
+            <button type="submit" className="primary">Sign in</button>
+          </form>
+          {realAuth.problem && <p role="alert">{realAuth.problem}</p>}
+        </section>
+      )}
+      {!presenter && info && info.source === 'real' && realAuth.subject && (
+        <p className="banner" role="status">Signed in as <strong>{realAuth.subject}</strong> through real PingFederate pi.flow.</p>
+      )}
       {!presenter && (
         <nav className="tabs" role="tablist" aria-label="Views" onKeyDown={onTabKeyDown}>
           {TABS.map((t) => (

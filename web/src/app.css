@@ -135,3 +135,7 @@ th { color: var(--text); }
   dl { grid-template-columns: 1fr; }
   .dg-canvas { height: 360px; }
 }
+.mode-toggle { display: inline-flex; gap: 6px; }
+.mode-toggle button[aria-pressed='true'] { font-weight: 700; text-decoration: underline; }
+.real-signin { max-width: 40rem; margin: 12px auto; padding: 12px 16px; border: 1px solid var(--border, #ccc); border-radius: 8px; }
+.real-signin form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }

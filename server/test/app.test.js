@@ -187,3 +187,89 @@ test('a redirect to the client with an error is not reported as accepted', async
     assert.deepEqual(body.authError, { error: 'server_error', description: 'no authentication methods' });
   } finally { await lab.close(); }
 });
+
+// Rule 19: /api/info + POST /api/mode, and the real pi.flow sign-in routes.
+test('rule 19: info reports source mock by default; the switch validates its body; hosted refuses; real without config is 409', async () => {
+  const lab = await start();
+  try {
+    const info = await (await fetch(`${lab.base}/api/info`)).json();
+    assert.equal(info.source, 'mock');
+    assert.equal(info.realAvailable, false);
+    assert.match(info.realFix, /PF_AUTH_CLIENT_ID/);
+
+    const bad = await fetch(`${lab.base}/api/mode`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source: 'live' }) });
+    assert.equal(bad.status, 400);
+    const extra = await fetch(`${lab.base}/api/mode`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source: 'mock', extra: 1 }) });
+    assert.equal(extra.status, 400);
+
+    const conflict = await fetch(`${lab.base}/api/mode`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source: 'real' }) });
+    assert.equal(conflict.status, 409);
+    assert.match((await conflict.json()).message, /Real mode needs:/);
+
+    const switched = await fetch(`${lab.base}/api/mode`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source: 'mock' }) });
+    assert.equal(switched.status, 200);
+    assert.equal((await switched.json()).source, 'mock');
+  } finally { await lab.close(); }
+});
+
+test('rule 19: with a full sign-in client real is available, switches, and the sign-in drives a canned pi.flow to a subject', async () => {
+  const seen = { states: {}, checkAuth: null, redeemBody: null };
+  let flowId = 'flow-test-000001';
+  let failCheck = false;
+  const lab = await start({
+    PF_AUTH_CLIENT_ID: 'client-abc',
+    PF_AUTH_CLIENT_SECRET: 'secret-xyz',
+    PF_AUTH_REDIRECT_URI: 'http://127.0.0.1:1/callback',
+    PF_AUTH_SCOPE: 'openid profile',
+  }, (target, init) => {
+    const path = target.pathname;
+    const json = (status, body, cookies = []) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...(cookies.length ? { 'set-cookie': cookies } : {}) } });
+    if (path === '/.well-known/openid-configuration') return json(200, { issuer: PF, authorization_endpoint: `${PF}/as/authorization.oauth2`, token_endpoint: `${PF}/as/token.oauth2` });
+    if (path === '/as/authorization.oauth2') {
+      seen.states[target.searchParams.get('state')] = flowId;
+      return json(200, { id: flowId, status: 'USERNAME_PASSWORD_REQUIRED', _links: { 'usernamePassword.check': { href: `${PF}/pf-ws/authn/flows/${flowId}` }, self: { href: `${PF}/pf-ws/authn/flows/${flowId}` } } }, ['ST=st-1; Path=/; HttpOnly']);
+    }
+    if (path === `/pf-ws/authn/flows/${flowId}`) {
+      seen.checkAuth = init.headers.authorization ?? null;
+      if (failCheck) return json(401, { message: 'invalid credentials' });
+      const runState = Object.entries(seen.states).reverse().find(([, f]) => f === flowId)?.[0] ?? null;
+      return json(200, { status: 'COMPLETED', authorizeResponse: { code: 'code-ok', state: runState } });
+    }
+    if (path === '/as/token.oauth2') {
+      seen.redeemBody = init.body ? String(init.body) : null;
+      const claims = Buffer.from(JSON.stringify({ sub: 'jdoe', preferred_username: 'jdoe', aud: 'client-abc' })).toString('base64url');
+      return json(200, { access_token: `header.${claims}.sig`, token_type: 'Bearer' });
+    }
+    return json(404, {});
+  });
+  try {
+    const info = await (await fetch(`${lab.base}/api/info`)).json();
+    assert.equal(info.realAvailable, true);
+    const switched = await fetch(`${lab.base}/api/mode`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source: 'real' }) });
+    assert.equal(switched.status, 200);
+    assert.equal((await switched.json()).source, 'real');
+
+    // the sign-in refuses bad credentials and clears the run
+    const start1 = await fetch(`${lab.base}/api/auth/real/start`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(start1.status, 200);
+    assert.equal((await start1.json()).status, 'USERNAME_PASSWORD_REQUIRED');
+    failCheck = true;
+    const refused = await fetch(`${lab.base}/api/auth/real/credentials`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'jdoe', password: 'wrong' }) });
+    if (refused.status !== 401) console.error('DEBUG refused', refused.status, JSON.stringify(await refused.json()).slice(0, 300));
+    assert.equal(refused.status, 401);
+    assert.equal((await refused.json()).error, 'credentials_refused');
+
+    // a fresh start, then the happy path: the completed flow's code is redeemed with PKCE and the subject is shown
+    const start2 = await fetch(`${lab.base}/api/auth/real/start`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(start2.status, 200);
+    failCheck = false;
+    const ok = await fetch(`${lab.base}/api/auth/real/credentials`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'jdoe', password: 'correct' }) });
+    assert.equal(ok.status, 200);
+    const done = await ok.json();
+    assert.equal(done.ok, true);
+    assert.equal(done.subject, 'jdoe');
+    assert.equal(done.sub, 'jdoe');
+    assert.match(String(seen.redeemBody), /grant_type=authorization_code/);
+    assert.match(String(seen.redeemBody), /code_verifier=/);
+  } finally { await lab.close(); }
+});

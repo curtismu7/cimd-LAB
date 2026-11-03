@@ -15,6 +15,11 @@ async function call(method, path, body) {
 }
 export const api = {
   config: () => call('GET', '/api/config'),
+  info: () => call('GET', '/api/info'),
+  setMode: (source) => call('POST', '/api/mode', { source }),
+  realAuthConfig: () => call('GET', '/api/auth/real/config'),
+  realAuthStart: () => call('POST', '/api/auth/real/start', {}),
+  realAuthCredentials: (body) => call('POST', '/api/auth/real/credentials', body),
   pfStatus: () => call('GET', '/api/pf/status'),
   pfProbe: (preset) => call('POST', '/api/pf/probe', { preset, confirm: true }),
   validate: (document) => call('POST', '/api/validate', { document }),

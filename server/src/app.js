@@ -11,6 +11,7 @@ import { createWorkspaces } from './workspace.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { renderStory, verticalList, StoryError } from './stories.js';
 import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js';
+import { createPiFlowLogin, loginProblems, claimSubject, flowView } from './piFlowLogin.js';
 import { evaluate, SimRefused, SCHEMA as SIM_SCHEMA, LIMITS as SIM_LIMITS, DEFAULTS as SIM_DEFAULTS, DOCUMENTS as SIM_DOCUMENTS, FAILURE_POLICIES as SIM_POLICIES, METADATA_TAGS } from './gateway-sim.js';
 import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim-claims.js';
 import { MOCK_TABLE } from './gateway-sim-table.js';
@@ -95,6 +96,15 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   const allowList = String(env.ALLOWED_CLIENT_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   let auth;
   const workspaces = createWorkspaces({ hosted, local: env.WORKSPACE, now, onEvict: (id) => auth.drop(id) });
+  // Rule 19: source is 'mock' (the lab's teaching server only, the default) or 'real' (the same lab plus a real
+  // PingFederate sign-in for the person at the page). Real needs the PF sign-in client configured.
+  const pfConfig = () => {
+    const pf = pfSettings(env);
+    return { pfBase: pf.base, pfAuthClientId: (env.PF_AUTH_CLIENT_ID || '').trim(), pfAuthClientSecret: (env.PF_AUTH_CLIENT_SECRET || '').trim(), pfAuthRedirectUri: (env.PF_AUTH_REDIRECT_URI || '').trim(), pfAuthScope: (env.PF_AUTH_SCOPE || '').trim() };
+  };
+  let source = 'mock';
+  const realAvailable = () => { const c = pfConfig(); return loginProblems(c).length === 0; };
+  const realFix = () => `Real mode needs: ${loginProblems(pfConfig()).join('; ')}. Set them in the lab's environment, then restart.`;
   auth = createAuthServer({
     touch: workspaces.touch,
     allowedHosts: allowList.length ? new Set(allowList) : null,
@@ -155,6 +165,62 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
       response_types: ['code'],
       token_endpoint_auth_method: 'none',
     });
+  });
+
+  // Rule 19: what the build is, and POST /api/mode {source:"mock"|"real"} switches at runtime. Hosted copies
+  // stay in mock (403); Real without the sign-in client answers 409 with the how-to.
+  app.get('/api/info', (req, res) => {
+    res.set('Cache-Control', 'no-store').json({
+      demo: DEMO,
+      hosted,
+      source,
+      mode: source,
+      realAvailable: realAvailable(),
+      ...(!realAvailable() ? { realFix: realFix() } : {}),
+      workspaceId: req.workspaceId,
+    });
+  });
+  app.post('/api/mode', limit('mode'), express.json({ limit: '1kb' }), (req, res) => {
+    if (hosted) return res.status(403).json({ error: 'hosted', message: 'This hosted copy stays in mock mode. Run the lab locally to switch.' });
+    const b = req.body;
+    if (!b || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length !== 1 || !['mock', 'real'].includes(b.source)) {
+      return res.status(400).json({ error: 'bad_body', message: 'body must be exactly {"source": "mock" or "real"}' });
+    }
+    if (b.source === 'real' && !realAvailable()) return res.status(409).json({ error: 'conflict', message: realFix() });
+    source = b.source;
+    res.set('Cache-Control', 'no-store').json({ source });
+  });
+
+  // Real sign-in (live PingFederate, pi.flow): one run in flight per workspace. The lab never stores the
+  // resulting token; it verifies nothing beyond the token endpoint's answer and shows the subject claims.
+  const pfLogin = createPiFlowLogin({ cfg: pfConfig(), fetchImpl, now });
+  const loginRuns = new Map();
+  app.get('/api/auth/real/config', limit('auth-config'), (req, res) => {
+    res.set('Cache-Control', 'no-store').json({ available: realAvailable(), source, workspaceId: req.workspaceId, ...(!realAvailable() ? { fix: realFix() } : {}) });
+  });
+  app.post('/api/auth/real/start', limit('auth-start'), async (req, res) => {
+    if (!realAvailable()) return res.status(409).json({ error: 'conflict', message: realFix() });
+    try {
+      const run = await pfLogin.start();
+      loginRuns.set(req.workspaceId, run);
+      res.set('Cache-Control', 'no-store').json({ ok: true, status: run.status, ...flowView({ status: run.status, _links: {} }) });
+    } catch (error) {
+      return res.status(error.status || 502).json({ error: error.code || 'signin_failed', message: error.message, ...(error.detail ? { detail: error.detail } : {}) });
+    }
+  });
+  app.post('/api/auth/real/credentials', limit('auth-cred'), express.json({ limit: '4kb' }), async (req, res) => {
+    if (!realAvailable()) return res.status(409).json({ error: 'conflict', message: realFix() });
+    const run = loginRuns.get(req.workspaceId);
+    try {
+      const tokens = await pfLogin.submit(run, { username: req.body?.username, password: req.body?.password });
+      loginRuns.delete(req.workspaceId);
+      const summary = claimSubject(tokens.accessToken);
+      res.set('Cache-Control', 'no-store').json({ ok: true, subject: summary?.preferredUsername || summary?.sub || null, sub: summary?.sub ?? null, aud: summary?.aud ?? null });
+    } catch (error) {
+      const status = error.status || 502;
+      if (status >= 401) loginRuns.delete(req.workspaceId);
+      return res.status(status).json({ error: error.code || 'signin_failed', message: error.message, ...(error.detail ? { detail: error.detail } : {}) });
+    }
   });
 
   // The redirect_uri the lab's own client document lists; it only needs to exist.
