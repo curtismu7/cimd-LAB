@@ -128,7 +128,8 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
 
   app.use((req, res, next) => {
-    if (!allowedHosts.has(req.headers.host ?? '')) return res.status(403).json({ error: 'host not allowed' });
+    const hostNoPort = String(req.headers.host ?? '').replace(/:\d+$/, '').toLowerCase();
+    if (!allowedHosts.has(req.headers.host ?? '') && !allowedHosts.has(hostNoPort)) return res.status(403).json({ error: 'host not allowed' });
     next();
   });
   app.use((req, res, next) => {
