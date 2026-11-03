@@ -41,8 +41,8 @@ export function toFlow(diagram, positions, activeEdges, simulating) {
       label: e.label,
       animated: on,
       markerEnd: { type: MarkerType.ArrowClosed },
-      className: on ? 'edge-on' : simulating ? 'edge-dim' : '',
-      style: { strokeWidth: on ? 3 : 1.5 },
+      className: `${on ? 'edge-on' : simulating ? 'edge-dim' : ''}${e.color ? ` edge-${e.color}` : ''}`,
+      style: { strokeWidth: on ? 3 : 1.5, ...(e.dashed ? { strokeDasharray: '6 4' } : {}) },
     };
   });
   return { nodes, edges };
