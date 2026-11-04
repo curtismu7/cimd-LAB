@@ -4,28 +4,134 @@
   "title": "Registration versus a metadata document",
   "lede": "With dynamic client registration the client registers first and gets an id. With CIMD the id is a URL and the server reads the document behind it.",
   "groups": {
-    "client": { "label": "The client", "color": "dark" },
-    "as": { "label": "Authorization server", "color": "blue" },
-    "web": { "label": "Hosted by the client", "color": "grey" }
+    "client": {
+      "label": "The client",
+      "color": "dark"
+    },
+    "as": {
+      "label": "Authorization server",
+      "color": "blue"
+    },
+    "web": {
+      "label": "Hosted by the client",
+      "color": "grey"
+    }
   },
   "nodes": [
-    { "id": "client", "group": "client", "label": "Client", "sub": ["Wants to ask for a code"], "x": 0, "y": 160 },
-    { "id": "register", "group": "as", "label": "Registration endpoint", "sub": ["DCR: POST the metadata"], "x": 340, "y": 0 },
-    { "id": "store", "group": "as", "label": "Client database", "sub": ["Keeps every registered client", "Issues an id (and maybe a secret)"], "x": 680, "y": 0 },
-    { "id": "authorize", "group": "as", "label": "Authorization endpoint", "sub": ["Same request either way"], "x": 340, "y": 160 },
-    { "id": "doc", "group": "web", "label": "Metadata document", "sub": ["https URL is the client_id", "No secret in it"], "x": 680, "y": 320 }
+    {
+      "id": "client",
+      "group": "client",
+      "label": "Client",
+      "sub": [
+        "Wants to ask for a code"
+      ],
+      "x": 0,
+      "y": 160
+    },
+    {
+      "id": "register",
+      "group": "as",
+      "label": "Registration endpoint",
+      "sub": [
+        "DCR: POST the metadata"
+      ],
+      "x": 340,
+      "y": 0
+    },
+    {
+      "id": "store",
+      "group": "as",
+      "label": "Client database",
+      "sub": [
+        "Keeps every registered client",
+        "Issues an id (and maybe a secret)"
+      ],
+      "x": 680,
+      "y": 0
+    },
+    {
+      "id": "authorize",
+      "group": "as",
+      "label": "Authorization endpoint",
+      "sub": [
+        "Same request either way"
+      ],
+      "x": 340,
+      "y": 160
+    },
+    {
+      "id": "doc",
+      "group": "web",
+      "label": "Metadata document",
+      "sub": [
+        "https URL is the client_id",
+        "No secret in it"
+      ],
+      "x": 680,
+      "y": 320
+    }
   ],
   "edges": [
-    { "source": "client", "target": "register", "label": "DCR 1 register" },
-    { "source": "register", "target": "store", "label": "DCR 2 store" },
-    { "source": "store", "target": "client", "label": "DCR 3 issued client_id" },
-    { "source": "client", "target": "authorize", "label": "authorize with client_id" },
-    { "source": "authorize", "target": "doc", "label": "CIMD 1 fetch the URL" },
-    { "source": "doc", "target": "authorize", "label": "CIMD 2 JSON back" }
+    {
+      "source": "client",
+      "target": "register",
+      "label": "DCR 1 register",
+      "color": "green"
+    },
+    {
+      "source": "register",
+      "target": "store",
+      "label": "DCR 2 store"
+    },
+    {
+      "source": "store",
+      "target": "client",
+      "label": "DCR 3 issued client_id",
+      "color": "blue"
+    },
+    {
+      "source": "client",
+      "target": "authorize",
+      "label": "authorize with client_id",
+      "color": "blue"
+    },
+    {
+      "source": "authorize",
+      "target": "doc",
+      "label": "CIMD 1 fetch the URL",
+      "color": "blue"
+    },
+    {
+      "source": "doc",
+      "target": "authorize",
+      "label": "CIMD 2 JSON back"
+    }
   ],
   "steps": [
-    { "title": "DCR: register first", "what": "The client posts its metadata, the server stores it and returns an id. The server now owns a record per client.", "edges": [0, 1, 2] },
-    { "title": "Then authorize", "what": "The request carries the issued client_id.", "edges": [3] },
-    { "title": "CIMD: no registration", "what": "The client_id is a URL. The server fetches the document at request time and validates it. The client owns the document, the server keeps no record.", "edges": [3, 4, 5] }
+    {
+      "title": "DCR: register first",
+      "what": "The client posts its metadata, the server stores it and returns an id. The server now owns a record per client.",
+      "edges": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "title": "Then authorize",
+      "what": "The request carries the issued client_id.",
+      "edges": [
+        3
+      ]
+    },
+    {
+      "title": "CIMD: no registration",
+      "what": "The client_id is a URL. The server fetches the document at request time and validates it. The client owns the document, the server keeps no record.",
+      "edges": [
+        3,
+        4,
+        5
+      ]
+    }
   ]
 }

@@ -4,32 +4,164 @@
   "title": "The lab as the server: a tester probes it",
   "lede": "A client.dev-style tester sends authorize requests to the lab's own teaching server. The server fetches fixture documents and refuses the bad ones.",
   "groups": {
-    "tester": { "label": "Tester", "color": "dark" },
-    "lab": { "label": "Lab teaching server (not a product)", "color": "blue" },
-    "fix": { "label": "Fixtures", "color": "grey" }
+    "tester": {
+      "label": "Tester",
+      "color": "dark"
+    },
+    "lab": {
+      "label": "Lab teaching server (not a product)",
+      "color": "blue"
+    },
+    "fix": {
+      "label": "Fixtures",
+      "color": "grey"
+    }
   },
   "nodes": [
-    { "id": "tester", "group": "tester", "label": "Tester", "sub": ["POST /api/tester/run", "One request per way a document goes wrong"], "x": 0, "y": 140 },
-    { "id": "as", "group": "lab", "label": "Lab authorization server", "sub": ["Discovery says CIMD is supported", "/as/authorize"], "x": 320, "y": 140 },
-    { "id": "guard", "group": "lab", "label": "Address guard", "sub": ["Refuses private and metadata addresses", "No redirects, size cap"], "x": 640, "y": 140 },
-    { "id": "fixtures", "group": "fix", "label": "Fixture documents", "sub": ["Good, mismatched, secret, oversize, not JSON, redirect"], "x": 960, "y": 20 },
-    { "id": "validator", "group": "lab", "label": "Document validator", "sub": ["The rules from the Learn tab"], "x": 960, "y": 260 },
-    { "id": "token", "group": "lab", "label": "Consent, code, token", "sub": ["PKCE, single-use code", "Opaque teaching token"], "x": 320, "y": 380 }
+    {
+      "id": "tester",
+      "group": "tester",
+      "label": "Tester",
+      "sub": [
+        "POST /api/tester/run",
+        "One request per way a document goes wrong"
+      ],
+      "x": 0,
+      "y": 140
+    },
+    {
+      "id": "as",
+      "group": "lab",
+      "label": "Lab authorization server",
+      "sub": [
+        "Discovery says CIMD is supported",
+        "/as/authorize"
+      ],
+      "x": 320,
+      "y": 140
+    },
+    {
+      "id": "guard",
+      "group": "lab",
+      "label": "Address guard",
+      "sub": [
+        "Refuses private and metadata addresses",
+        "No redirects, size cap"
+      ],
+      "x": 640,
+      "y": 140
+    },
+    {
+      "id": "fixtures",
+      "group": "fix",
+      "label": "Fixture documents",
+      "sub": [
+        "Good, mismatched, secret, oversize, not JSON, redirect"
+      ],
+      "x": 960,
+      "y": 20
+    },
+    {
+      "id": "validator",
+      "group": "lab",
+      "label": "Document validator",
+      "sub": [
+        "The rules from the Learn tab"
+      ],
+      "x": 960,
+      "y": 260
+    },
+    {
+      "id": "token",
+      "group": "lab",
+      "label": "Consent, code, token",
+      "sub": [
+        "PKCE, single-use code",
+        "Opaque teaching token"
+      ],
+      "x": 320,
+      "y": 380
+    }
   ],
   "edges": [
-    { "source": "tester", "target": "as", "label": "1 authorize" },
-    { "source": "as", "target": "guard", "label": "2 fetch the client_id URL" },
-    { "source": "guard", "target": "fixtures", "label": "3 GET document" },
-    { "source": "fixtures", "target": "validator", "label": "4 document" },
-    { "source": "validator", "target": "as", "label": "5 verdict" },
-    { "source": "as", "target": "tester", "label": "6 HTTP 400 with the failed check" },
-    { "source": "as", "target": "token", "label": "6 valid: consent" },
-    { "source": "token", "target": "tester", "label": "7 code, then token once" }
+    {
+      "source": "tester",
+      "target": "as",
+      "label": "1 authorize",
+      "color": "blue"
+    },
+    {
+      "source": "as",
+      "target": "guard",
+      "label": "2 fetch the client_id URL",
+      "color": "blue"
+    },
+    {
+      "source": "guard",
+      "target": "fixtures",
+      "label": "3 GET document"
+    },
+    {
+      "source": "fixtures",
+      "target": "validator",
+      "label": "4 document"
+    },
+    {
+      "source": "validator",
+      "target": "as",
+      "label": "5 verdict"
+    },
+    {
+      "source": "as",
+      "target": "tester",
+      "label": "6 HTTP 400 with the failed check"
+    },
+    {
+      "source": "as",
+      "target": "token",
+      "label": "6 valid: consent",
+      "color": "green"
+    },
+    {
+      "source": "token",
+      "target": "tester",
+      "label": "7 code, then token once",
+      "color": "green"
+    }
   ],
   "steps": [
-    { "title": "Tester sends a request", "what": "Each case uses a different client_id URL: one good, the rest broken in one specific way.", "edges": [0] },
-    { "title": "The server fetches under guard", "what": "The address guard refuses private hosts, cloud metadata addresses and credentials in the URL before any fetch.", "edges": [1, 2, 3] },
-    { "title": "Bad documents are refused", "what": "The validator names the failed check and the server answers HTTP 400 with it.", "edges": [4, 5] },
-    { "title": "A good document goes through", "what": "Consent, then a code that works once with the PKCE verifier. A second use is invalid_grant.", "edges": [4, 6, 7] }
+    {
+      "title": "Tester sends a request",
+      "what": "Each case uses a different client_id URL: one good, the rest broken in one specific way.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "The server fetches under guard",
+      "what": "The address guard refuses private hosts, cloud metadata addresses and credentials in the URL before any fetch.",
+      "edges": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "title": "Bad documents are refused",
+      "what": "The validator names the failed check and the server answers HTTP 400 with it.",
+      "edges": [
+        4,
+        5
+      ]
+    },
+    {
+      "title": "A good document goes through",
+      "what": "Consent, then a code that works once with the PKCE verifier. A second use is invalid_grant.",
+      "edges": [
+        4,
+        6,
+        7
+      ]
+    }
   ]
 }
