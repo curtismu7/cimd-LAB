@@ -184,6 +184,17 @@ The probe needs three objects in the PingFederate the owner points `PF_BASE_URL`
 
 **Roll back** by deleting those three objects (the mapping first, then the access token manager, then the policy). Nothing else in PingFederate is changed by this lab, and the lab never writes to PingFederate.
 
+#### Run the real client.dev locally (direction 1, live)
+
+Stytch's [client.dev](https://github.com/stytchauth/client.dev) (MIT) runs locally (`git clone`, `npm install`, `npm run dev` — Next.js on localhost:3000). Its **server explorer** drives a real browser flow against any https authorization server: discovery, the CIMD document as client_id, PKCE and a code exchange — the same two sides this tab probes, but end to end in a browser. Two of its values are hardcoded to its own public site, so a local clone needs a four-line patch before PingFederate will accept it:
+
+1. In `app/servers/tabexplore.tsx`, replace both occurrences of the client_id `"https://client.dev/oauth/metadata.json"` and both of the redirect `"https://client.dev/oauth/callback"` (the authorize request and the stored flow state).
+2. Point the client_id at this lab's document URL (`CIMD_CLIENT_DEV_LOCAL_URL`, served by the lab at `/client-dev-local.json` over the TLS front, like the own document) and the redirect at `CIMD_CLIENT_DEV_LOCAL_REDIRECT`. The lab serves a matching document with those exact values, so the CIMD §4 invariant (client_id IS the document URL) holds.
+3. PingFederate needs an **enabled CIMD policy listing exactly that document URL** (one URL per policy — the measured finding above). The callback must be an https address PingFederate may redirect to; the TLS front on 5251 provides one.
+4. Run the explorer with the local PingFederate's discovery/token endpoints, and sign in.
+
+The patch lives only in your clone: never committed, never shipped. The lab ships the recipe, the document endpoint and the `client.dev local clone` probe preset, which pre-flights the same client_id/redirect pair the clone uses (a probe `accepted` is what the explorer's step should reproduce in a browser). The preset is a lab reading; anything you measure in the live run is recorded by you as measured.
+
 #### Direction 1 against a PingFederate on this machine (local Docker only)
 
 `docker-compose.local-pf.yml` points the container at a local PingFederate behind a mkcert certificate: it maps the PF host name to the host machine and trusts the mkcert root (a public certificate). Set `MKCERT_CA`, `PF_LOCAL_HOST` and `PF_BASE_URL` (see the file header), then `docker compose -f docker-compose.yml -f docker-compose.local-pf.yml up -d`. That PingFederate needs an enabled CIMD policy for client.dev, an opaque token manager and an `authz_req` mapping for it; verified 2026-10-30 on PingFederate 13.1.3: the probe returns `accepted` and PingFederate's sign-in page. The override also starts an nginx front on `127.0.0.1:5251` (mkcert certificate, `MKCERT_CERT` and `MKCERT_KEY`) so the lab's own document is served over https at `https://<pf-host>:5251/client.json`; the local PingFederate also needs an enabled CIMD policy for exactly that URL. Verified 2026-10-30: both the client.dev and own-document probes return `accepted`, and a real sign-in with the own document (PKCE, client_id = the document URL) returned a code and `POST /as/token.oauth2` answered 200 with a Bearer token. Both containers carry `restart: unless-stopped`, because PingFederate fetches the document at request time and a stopped lab shows as "Unable to retrieve client metadata".
