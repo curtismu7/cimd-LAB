@@ -21,13 +21,17 @@ jobs:
 
   test:
     runs-on: ${{ fromJSON(vars.RUNS_ON || '["ubuntu-latest"]') }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 26
       - run: npm ci
-      - run: npm test
+      - name: server tests (per-test timeout, names the stuck test)
+        run: cd server && node --test --test-timeout=60000 --test-reporter=spec test/*.test.js
+      - name: web tests
+        run: cd web && npx vitest run
       - run: bash scripts/check-ui-standard.sh
       - name: SE manifests render (dry run, no cluster)
         run: NAMESPACE=ci IMAGE=registry.invalid/cimd-lab:ci SE_HOST=cimd-lab.invalid PF_BASE_URL=https://pf.invalid DRY_RUN=1 scripts/deploy-se.sh > /dev/null
