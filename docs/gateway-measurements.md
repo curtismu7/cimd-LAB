@@ -49,3 +49,27 @@ client **without** PKCE. The real gateway advertises `S256` and its
 `/authorize` is where enforcement would live. The deck's "mandatory PKCE" is
 therefore a **policy choice per server**, not something CIMD itself imposes —
 which is exactly the distinction the tab's tag system is for.
+
+## Full CIMD authorization accepted (measured 2026-11-05, after the owner
+## allowlisted the document in Settings → MCP Client Documents)
+
+`GET /opensearch22/authorize?...client_id=https://client.dev/oauth/metadata.json&redirect_uri=https://client.dev/oauth/callback&code_challenge=…&code_challenge_method=S256`
+answers **302 to the gateway's PingOne sign-in** — fetched, validated, moved on.
+
+Validation measured on the real gateway:
+
+| Request | Answer |
+|---|---|
+| redirect_uri not in the document | 400 `redirect_uri is not registered for this client` |
+| `code_challenge_method=plain` | 400 `PKCE required with S256 method` |
+| no `code_challenge` | 400 `PKCE required with S256 method` |
+| S256 + redirect in the document | 302 to sign-in |
+
+Caching: three consecutive authorizes each answered in 0.27–0.28 s — cache-served.
+
+## The PKCE contrast (measured on both products)
+
+- **Ping MCP gateway**: enforces PKCE S256 for CIMD clients.
+- **PingFederate 13.1**: accepts a CIMD client without PKCE.
+
+"mandatory PKCE" is a policy choice per server, not CIMD-inherent.
