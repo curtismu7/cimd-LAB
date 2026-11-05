@@ -3,7 +3,7 @@
 Teaches OAuth Client ID Metadata Documents (CIMD) in both directions, against real PingFederate and against the lab's own teaching server, plus a clearly labelled local simulation of the H2 2026 claim that an MCP gateway prefers CIMD client registration.
 
 Tier: Demo
-Repo: https://github.com/ping-sandbox/cimd-LAB
+Repo: https://github.com/curtismu7/cimd-LAB
 Catalog: D36
 
 **Tier: Demo.** The repo is named `cimd-lab` today; the `-LAB` name above follows the family convention and is the owner's to confirm when the repo moves. Catalog D36 is the catalog's own "CIMD lab" row.
@@ -47,7 +47,7 @@ The "Why it matters" lines (challenge, technical, business) are quoted as printe
 Prerequisites: Node 26 or newer. Docker only for the Docker form. With no setup at all, the Learn, Lab as server, H2 2026 (Mock and Live), Stories and Talk track tabs work offline; only direction 1 needs a PingFederate you own.
 
 ```
-git clone https://github.com/ping-sandbox/cimd-LAB.git
+git clone https://github.com/curtismu7/cimd-LAB.git
 cd cimd-LAB
 npm ci
 npm run build
