@@ -16,6 +16,7 @@ import { evaluate, SimRefused, SCHEMA as SIM_SCHEMA, LIMITS as SIM_LIMITS, DEFAU
 import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim-claims.js';
 import { MOCK_TABLE } from './gateway-sim-table.js';
 import { maskDeep } from './mask.js';
+import { shelfInfo } from './shelfLink.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
 const MAX_PASTED_BYTES = 16 * 1024;
@@ -361,6 +362,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
 
   // The built web UI, when it exists. Registered last so it never shadows an API route.
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
+app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.use(express.static(webDist));
     // Only an address with no file extension and outside /assets/ is a page; a missing file (/assets/x.js, /favicon.ico, /robots.txt) is a JSON 404.
     app.get(PAGE_PATH, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
