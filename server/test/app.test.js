@@ -166,6 +166,29 @@ test('PingFederate probe: confirm gate, presets only, verdict from canned replie
   } finally { await lab.close(); }
 });
 
+test('conformance run: three probes against the own document, each row tagged measured', async () => {
+  const lab = await start({ CIMD_CLIENT_ID_URL: 'https://lab.example:5251/client.json', CIMD_REDIRECT_URI: 'https://lab.example:5251/callback' }, (url) => {
+    // PingFederate accepts the allowlisted document URL and refuses the unlisted one.
+    if (url.searchParams.get('client_id') === 'https://unlisted.invalid/doc.json') return new Response('Invalid client_id', { status: 400 });
+    return new Response('<html><form>password</form></html>', { status: 200 });
+  });
+  try {
+    const run = (body) => fetch(`${lab.base}/api/pf/conformance`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await run({})).status, 400, 'confirm required');
+    const none = await start({}, () => assert.fail('must not be contacted'));
+    try {
+      assert.equal((await fetch(`${none.base}/api/pf/conformance`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: true }) })).status, 409, 'no PF_BASE_URL: not configured');
+    } finally { await none.close(); }
+    const data = await (await run({ confirm: true })).json();
+    assert.deepEqual(data.results.map((r) => r.id), ['listed-document', 'unlisted-document', 'pkce-omitted']);
+    const byId = Object.fromEntries(data.results.map((r) => [r.id, r]));
+    assert.equal(byId['listed-document'].verdict, 'accepted');
+    assert.equal(byId['unlisted-document'].verdict, 'rejected');
+    assert.equal(byId['pkce-omitted'].verdict, 'accepted', 'the fake PF answers the form page regardless');
+    for (const r of data.results) assert.equal(r.tag, 'measured (our note)');
+  } finally { await lab.close(); }
+});
+
 test('own-client probe needs configuration; PF_BASE_URL must be https', async () => {
   const lab = await start({}, () => new Response('', { status: 302, headers: { location: '/x' } }));
   try {

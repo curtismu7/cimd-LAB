@@ -22,6 +22,7 @@ export const api = {
   realAuthCredentials: (body) => call('POST', '/api/auth/real/credentials', body),
   pfStatus: () => call('GET', '/api/pf/status'),
   pfProbe: (preset) => call('POST', '/api/pf/probe', { preset, confirm: true }),
+  pfConformance: () => call('POST', '/api/pf/conformance', { confirm: true }),
   validate: (document) => call('POST', '/api/validate', { document }),
   gatewaySimInfo: () => call('GET', '/api/gateway-sim/info'),
   gatewaySimMock: () => call('GET', '/api/gateway-sim/mock'),

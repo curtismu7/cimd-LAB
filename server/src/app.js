@@ -10,7 +10,7 @@ import { runServerTests } from './tester.js';
 import { createWorkspaces } from './workspace.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { renderStory, verticalList, StoryError } from './stories.js';
-import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV, CLIENT_DEV_LOCAL } from './pf.js';
+import { pfSettings, discoverPf, probePf, runConformance, PfRefused, CLIENT_DEV, CLIENT_DEV_LOCAL } from './pf.js';
 import { createPiFlowLogin, loginProblems, claimSubject, flowView } from './piFlowLogin.js';
 import { evaluate, SimRefused, SCHEMA as SIM_SCHEMA, LIMITS as SIM_LIMITS, DEFAULTS as SIM_DEFAULTS, DOCUMENTS as SIM_DOCUMENTS, FAILURE_POLICIES as SIM_POLICIES, METADATA_TAGS } from './gateway-sim.js';
 import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim-claims.js';
@@ -56,7 +56,7 @@ const GET = ['GET', 'HEAD'];
 const POST = ['POST'];
 const ROUTE_METHODS = new Map([
   ['/api/health', GET], ['/api/config', GET], ['/api/stories', GET], ['/api/validate', POST], ['/api/tester/run', POST],
-  ['/api/pf/status', GET], ['/api/pf/probe', POST], ['/api/reset', POST], ['/api/gateway-sim/info', GET], ['/api/gateway-sim/mock', GET],
+  ['/api/pf/status', GET], ['/api/pf/probe', POST], ['/api/pf/conformance', POST], ['/api/reset', POST], ['/api/gateway-sim/info', GET], ['/api/gateway-sim/mock', GET],
   ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/client-dev-local.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
   ['/as/.well-known/oauth-authorization-server', GET],
 ]);
@@ -350,6 +350,18 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
       res.set('Cache-Control', 'no-store').json(await probePf({ base: pf.base, clientId, redirectUri, fetchImpl }));
     } catch (error) {
       res.status(error instanceof PfRefused ? 400 : 500).json({ error: error instanceof PfRefused ? error.message : 'pf_probe_failed' });
+    }
+  });
+
+  app.post('/api/pf/conformance', limit('pf-probe'), express.json({ limit: '1kb' }), async (req, res) => {
+    const pf = pfSettings(env);
+    if (!pf.base) return notConfigured(res);
+    try {
+      if (req.body?.confirm !== true) return res.status(400).json({ error: 'confirm_required' });
+      if (!pf.ownClientId || !pf.ownRedirectUri) return res.status(409).json({ error: 'own_client_not_configured', detail: 'The conformance run measures the lab\'s own allowlisted document; set CIMD_CLIENT_ID_URL and CIMD_REDIRECT_URI.' });
+      res.set('Cache-Control', 'no-store').json(await runConformance({ base: pf.base, clientId: pf.ownClientId, redirectUri: pf.ownRedirectUri, fetchImpl }));
+    } catch (error) {
+      res.status(error instanceof PfRefused ? 400 : 500).json({ error: error instanceof PfRefused ? error.message : 'pf_conformance_failed' });
     }
   });
 

@@ -47,12 +47,14 @@ export default function PfView({ resetKey }) {
   const [confirm, setConfirm] = useState(false);
   const [preset, setPreset] = useState('client.dev');
   const [probe, setProbe] = useState(null);
+  const [conformance, setConformance] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { let live = true; api.config().then((r) => live && setConfig(r)); return () => { live = false; }; }, []);
 
   const checkStatus = async () => { setBusy(true); setStatus(await api.pfStatus()); setBusy(false); };
   const runProbe = async () => { setBusy(true); setProbe(await api.pfProbe(preset)); setBusy(false); };
+  const runConformance = async () => { setBusy(true); setConformance(await api.pfConformance()); setBusy(false); };
   const s = status?.data;
   // Once the config has loaded, no PF_BASE_URL means nothing may be sent.
   const notConfigured = Boolean(config?.data) && !config.data.pfBase;
@@ -120,6 +122,36 @@ export default function PfView({ resetKey }) {
           </ul>
         </details>
       </section>
+
+      <section className="card" data-testid="pf-conformance">
+        <h3>Conformance run</h3>
+        <p>
+          Runs the lab&apos;s rules against real PingFederate, one probe per rule PingFederate can express: the
+          allowlisted document, an unlisted one, and a request without PKCE. Every row is a
+          measured note about <strong>PingFederate</strong> — never about the Ping MCP gateway.
+        </p>
+        <button type="button" className="primary" onClick={runConformance} disabled={busy || notConfigured}>Run conformance</button>
+        {conformance && !conformance.ok && !conformance.data?.results && (
+          <p className="tone-bad" data-testid="conformance-error">Conformance refused: <code>{String(conformance.data?.error ?? conformance.status)}</code> {conformance.data?.detail ? String(conformance.data.detail) : ''}</p>
+        )}
+        {conformance?.data?.results && (
+          <table data-testid="conformance-table">
+            <thead><tr><th scope="col">Rule</th><th scope="col">Verdict</th><th scope="col">What PingFederate answered</th></tr></thead>
+            <tbody>
+              {conformance.data.results.map((r) => (
+                <tr key={r.id}>
+                  <td><code>{r.id}</code></td>
+                  <td data-testid={`conformance-${r.id}`} className={r.expect && r.verdict === r.expect ? 'tone-good' : r.expect ? 'tone-bad' : ''}>
+                    {r.verdict}{r.expect ? (r.verdict === r.expect ? ' (as expected)' : ` (expected ${r.expect})`) : ''}
+                  </td>
+                  <td>{r.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
       <Validator />
 
       <details className="card" data-testid="client-dev-local-howto">

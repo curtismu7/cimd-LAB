@@ -151,3 +151,48 @@ export async function probePf({ base, clientId, redirectUri, fetchImpl = fetch }
     excerpt: excerpt(text),
   };
 }
+
+// Run the lab's engine rules against real PingFederate, one probe per rule PF can express.
+// Each result is a measured (our note) about PingFederate — never about the Ping MCP gateway.
+export async function runConformance({ base, clientId, redirectUri, fetchImpl = fetch }) {
+  const cases = [
+    { id: 'listed-document', claim: 'A URL client_id covered by an enabled CIMD policy is accepted (the deck allowlisted-and-fetched sentence, measured on PingFederate).', expect: 'accepted' },
+    { id: 'unlisted-document', claim: 'A URL client_id no policy lists is refused — the allowlist gates client existence.', expect: 'rejected' },
+    { id: 'pkce-omitted', claim: 'An authorization request without a code_challenge is answered by the PingFederate PKCE policy, not by CIMD; the lab records the actual answer.', expect: null },
+  ];
+  const results = [];
+  for (const c of cases) {
+    const raw = probePf({ base, clientId: c.id === 'unlisted-document' ? 'https://unlisted.invalid/doc.json' : clientId, redirectUri, fetchImpl });
+    const r = await (c.id === 'pkce-omitted' ? probeWithoutPkce({ base, clientId, redirectUri, fetchImpl }) : raw);
+    results.push({
+      id: c.id,
+      claim: c.claim,
+      expect: c.expect,
+      verdict: r.verdict,
+      status: r.status ?? null,
+      request: r.request,
+      traceparent: r.traceparent,
+      detail: r.verdict === 'accepted' ? 'PingFederate moved on to sign-in.' : r.verdict === 'rejected' ? excerpt(r.excerpt || '') : r.detail ?? 'unclear — read the request in the browser to judge.',
+      tag: 'measured (our note)',
+    });
+  }
+  return { results, banner: BANNER_PFN[0] };
+}
+
+// One probe with no code_challenge: the same listed client, PKCE left out.
+async function probeWithoutPkce({ base, clientId, redirectUri, fetchImpl }) {
+  const origin = assertConfigured(base).origin;
+  const state = crypto.randomBytes(8).toString('hex');
+  const query = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, state });
+  const url = `${origin}/as/authorization.oauth2?${query}`;
+  const tp = traceparent();
+  let response;
+  try { response = await get(url, fetchImpl, tp); } catch { return { reachable: false, request: url, traceparent: tp, verdict: 'unreachable' }; }
+  const text = await readCapped(response).then((body) => body.text).catch(() => '');
+  const verdict = response.status === 400 ? 'rejected'
+    : response.status === 200 && /<form|password|username/i.test(text) ? 'accepted'
+    : response.status >= 300 && response.status < 400 ? 'accepted' : 'unclear';
+  return { reachable: true, request: url, traceparent: tp, status: response.status, verdict, excerpt: excerpt(text) };
+}
+
+const BANNER_PFN = ['Measured against real PingFederate — never against the Ping MCP gateway.'];
