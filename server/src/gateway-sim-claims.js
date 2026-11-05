@@ -13,7 +13,7 @@ export const TAGS = Object.freeze([
   { tag: 'console swagger name (schema only)', meaning: 'A field name in the Privilege console swagger, 2026-10-31 baseline. It proves the field exists, not how it behaves. Nothing was called.' },
   { tag: 'lab reading', meaning: 'Behaviour the lab infers beside a deck sentence or a field name. The deck does not say it.' },
   { tag: 'lab-invented', meaning: 'Made up by the lab so the simulation can run. Not a claim about any product.' },
-  { tag: 'measured (our note)', meaning: 'Measured by this lab itself, never on the Ping MCP gateway.' },
+  { tag: 'measured (our note)', meaning: 'Measured by this lab itself. PingFederate measurements are about PingFederate; the 2026-11-05 gateway measurements (discovery metadata, allowlist gating) are about the demo tenant\'s real Ping MCP gateway, not a production deployment.' },
 ]);
 
 export const SLIDE = Object.freeze({
@@ -25,10 +25,10 @@ export const SLIDE = Object.freeze({
 
 export const CLAIMS = Object.freeze([
   { id: 'spec-prefers-cimd', tag: 'deck claim', text: 'CIMD is the registration mechanism the MCP specification now prefers over dynamic registration.', source: 'Slide 36, row "CIMD client registration"' },
-  { id: 'url-allowlisted', tag: 'deck claim', text: 'A client identifies itself by a document URL the tenant has allowlisted.', source: 'Slide 36, row "CIMD client registration"' },
+  { id: 'url-allowlisted', tag: 'deck claim', text: 'A client identifies itself by a document URL the tenant has allowlisted.', source: 'Slide 36, row "CIMD client registration"', measured: 'Measured on the demo tenant\'s real gateway (2026-11-05): an authorize with a real public document URL is refused 400 "client document … is not listed for this tenant" — the allowlist gates client existence. docs/gateway-measurements.md' },
   { id: 'fetch-validate-cache', tag: 'deck claim', text: 'The gateway fetches, validates and caches the document.', source: 'Slide 36, row "CIMD client registration"' },
-  { id: 'advertises-support', tag: 'deck claim', text: 'The gateway advertises CIMD support in its discovery metadata.', source: 'Slide 36, row "CIMD client registration"' },
-  { id: 'dcr-offered', tag: 'deck claim', text: 'The gateway is a full OAuth 2.1 authorization server: dynamic client registration, mandatory PKCE (S256) and refresh tokens.', source: 'Slide 36, row "Standards-based authorization"' },
+  { id: 'advertises-support', tag: 'deck claim', text: 'The gateway advertises CIMD support in its discovery metadata.', source: 'Slide 36, row "CIMD client registration"', measured: 'Measured on the demo tenant\'s real gateway (2026-11-05): discovery metadata carries client_id_metadata_document_supported: true. docs/gateway-measurements.md' },
+  { id: 'dcr-offered', tag: 'deck claim', text: 'The gateway is a full OAuth 2.1 authorization server: dynamic client registration, mandatory PKCE (S256) and refresh tokens.', source: 'Slide 36, row "Standards-based authorization"', measured: 'Measured on the demo tenant\'s real gateway (2026-11-05): registration_endpoint present, code_challenge_methods_supported ["S256"], grant_types include refresh_token. Mandatory is the server\'s choice — PingFederate accepts a CIMD client without PKCE (this lab\'s conformance run). docs/gateway-measurements.md' },
   { id: 'discovery-no-config', tag: 'deck claim', text: 'Published discovery metadata lets compliant MCP clients connect without custom configuration.', source: 'Slide 36, row "Standards-based authorization"' },
   { id: 'swagger-tenant-cimd', tag: 'console swagger name (schema only)', text: 'Tenant profile field CIMD: Clients[] (each URL and IsPrivate) and CacheTTLHours.', source: 'Console swagger 2026-10-31: modelCIMDConfig, modelCIMDClient' },
   { id: 'swagger-status-docs', tag: 'console swagger name (schema only)', text: 'Tenant profile status field CIMDDocuments[]: URL, Document, FetchedAt, Error.', source: 'Console swagger 2026-10-31: modelCIMDDocument' },
