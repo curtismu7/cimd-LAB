@@ -72,6 +72,7 @@ export default function PfView({ resetKey }) {
             <dt>PingFederate base</dt><dd>{config.data.pfBase ? <code>{String(config.data.pfBase)}</code> : 'not set'}</dd>
             <dt>Own document configured</dt><dd>{config.data.ownClientIdConfigured ? 'yes' : 'no (set CIMD_CLIENT_ID_URL and CIMD_REDIRECT_URI)'}</dd>
             <dt>client.dev example</dt><dd><code>{String(config.data.clientDev?.clientId)}</code></dd>
+            <dt>client.dev local clone configured</dt><dd data-testid="client-dev-local-config">{config.data.clientDevLocalConfigured ? <code>{String(config.data.clientDevLocal?.clientId)}</code> : 'no (see "Run the real client.dev locally" in the README)'}</dd>
           </dl>
         )}
         {config && !config.ok && <p className="tone-bad">Could not read /api/config.</p>}
@@ -99,6 +100,7 @@ export default function PfView({ resetKey }) {
         <fieldset>
           <legend>Preset</legend>
           <label className="inline"><input type="radio" name="preset" checked={preset === 'client.dev'} onChange={() => setPreset('client.dev')} /> client.dev public example</label>
+          <label className="inline"><input type="radio" name="preset" checked={preset === 'client-dev-local'} onChange={() => setPreset('client-dev-local')} /> client.dev local clone</label>
           <label className="inline"><input type="radio" name="preset" checked={preset === 'own'} onChange={() => setPreset('own')} /> This lab's own document</label>
         </fieldset>
         <label className="inline"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I confirm this sends a request to the PingFederate shown above</label>
@@ -119,6 +121,37 @@ export default function PfView({ resetKey }) {
         </details>
       </section>
       <Validator />
+
+      <details className="card" data-testid="client-dev-local-howto">
+        <summary><strong>Run the real client.dev locally (direction 1, live)</strong></summary>
+        <p>
+          stytchauth&apos;s <a href="https://client.dev" target="_blank" rel="noopener noreferrer">client.dev</a> (MIT)
+          can run on this machine and drive a real sign-in flow at PingFederate from its own UI — the same two
+          sides this tab probes, but with a browser. The lab never runs or ships client.dev&apos;s code; you clone
+          it and apply a four-line patch so its document URL and redirect land where PingFederate can use them.
+        </p>
+        <ol>
+          <li>Clone <a href="https://client.dev" target="_blank" rel="noopener noreferrer">client.dev</a> (its repo link is on the site), then <code>npm install</code> in the clone.</li>
+          <li>
+            In <code>app/servers/tabexplore.tsx</code> (both the request and the stored flow state) replace
+            <code>client_id: &quot;https://client.dev/oauth/metadata.json&quot;</code> with
+            <code>&quot;{config?.data?.clientDevLocal?.clientId || '&lt;your CIMD_CLIENT_DEV_LOCAL_URL&gt;'}&quot;</code> and
+            <code>redirect_uri: &quot;https://client.dev/oauth/callback&quot;</code> with
+            <code>&quot;{config?.data?.clientDevLocal?.redirectUri || '&lt;your CIMD_CLIENT_DEV_LOCAL_REDIRECT&gt;'}&quot;</code>.
+          </li>
+          <li><code>npm run dev</code> (Next.js on localhost:3000) and open its <em>server explorer</em>.</li>
+          <li>
+            Point its discovery/token fields at the PingFederate base above and run the flow. PingFederate needs an
+            enabled CIMD policy listing the exact document URL (one URL per policy) — the same recipe as this tab&apos;s
+            probe. Set <code>CIMD_CLIENT_DEV_LOCAL_URL</code> and <code>CIMD_CLIENT_DEV_LOCAL_REDIRECT</code> so the
+            &quot;client.dev local clone&quot; preset above pre-flights the same pair.
+          </li>
+        </ol>
+        <p className="hint">
+          Tags: the preset is a lab reading; anything you measure in the live run is yours to record as measured.
+          The patch is local to your clone — never committed, never shipped.
+        </p>
+      </details>
     </div>
   );
 }
