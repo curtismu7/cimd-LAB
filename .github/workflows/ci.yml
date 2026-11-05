@@ -28,8 +28,8 @@ jobs:
         with:
           node-version: 26
       - run: npm ci
-      - name: server tests (per-test timeout, names the stuck test)
-        run: cd server && node --test --test-timeout=60000 --test-reporter=spec test/*.test.js
+      - name: server tests (each file isolated, so a hang names its file)
+        run: cd server && for f in test/*.test.js; do echo "=== $f"; timeout 120 node --test --test-timeout=30000 --test-reporter=spec "$f" || { echo "STUCK OR FAILED: $f"; exit 1; }; done
       - name: web tests
         run: cd web && npx vitest run
       - run: bash scripts/check-ui-standard.sh
