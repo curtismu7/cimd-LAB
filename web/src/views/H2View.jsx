@@ -230,9 +230,9 @@ function H2Body({ resetKey, presenter }) {
             </ul>
             <div className="table-wrap">
               <table className="sim-table" data-testid="claims-table">
-                <thead><tr><th>Claim</th><th>Tag</th><th>Source</th></tr></thead>
+                <thead><tr><th>Claim</th><th>Tag</th><th>Source</th><th>Measured</th></tr></thead>
                 <tbody>
-                  {info.claims.map((c) => <tr key={c.id}><td>{c.text}</td><td><Tag tag={c.tag} /></td><td>{c.source}</td></tr>)}
+                  {info.claims.map((c) => <tr key={c.id}><td>{c.text}</td><td><Tag tag={c.tag} /></td><td>{c.source}</td><td>{c.measured ? <span data-testid={`measured-${c.id}`}>{c.measured}</span> : '—'}</td></tr>)}
                 </tbody>
               </table>
             </div>
