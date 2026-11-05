@@ -7,6 +7,7 @@ import LabView from './views/LabView.jsx';
 import TalkTrack from './views/TalkTrack.jsx';
 import Stories from './views/Stories.jsx';
 import H2View from './views/H2View.jsx';
+import ShelfLink from "./components/ShelfLink.jsx";
 
 export const TABS = [
   { id: 'learn', label: 'Learn', View: Learn },
@@ -125,6 +126,7 @@ export default function App() {
         {info && !hosted && tab !== 'h2' && <ModeToggle mode={info.source} realAvailable={info.realAvailable !== false} onChange={changeMode} />}
         {!presenter && (
           <div className="actions">
+            <ShelfLink />
             <button type="button" onClick={reset}>Reset</button>
             <button type="button" onClick={() => setTheme(nextTheme)} aria-label={`Theme: ${theme}. Switch to ${nextTheme}`}>Theme: {theme}</button>
           </div>
