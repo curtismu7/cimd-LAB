@@ -10,7 +10,7 @@ import { runServerTests } from './tester.js';
 import { createWorkspaces } from './workspace.js';
 import { loadCustomerConfig, publicConfig } from './customer.js';
 import { renderStory, verticalList, StoryError } from './stories.js';
-import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV } from './pf.js';
+import { pfSettings, discoverPf, probePf, PfRefused, CLIENT_DEV, CLIENT_DEV_LOCAL } from './pf.js';
 import { createPiFlowLogin, loginProblems, claimSubject, flowView } from './piFlowLogin.js';
 import { evaluate, SimRefused, SCHEMA as SIM_SCHEMA, LIMITS as SIM_LIMITS, DEFAULTS as SIM_DEFAULTS, DOCUMENTS as SIM_DOCUMENTS, FAILURE_POLICIES as SIM_POLICIES, METADATA_TAGS } from './gateway-sim.js';
 import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim-claims.js';
@@ -56,7 +56,7 @@ const POST = ['POST'];
 const ROUTE_METHODS = new Map([
   ['/api/health', GET], ['/api/config', GET], ['/api/stories', GET], ['/api/validate', POST], ['/api/tester/run', POST],
   ['/api/pf/status', GET], ['/api/pf/probe', POST], ['/api/reset', POST], ['/api/gateway-sim/info', GET], ['/api/gateway-sim/mock', GET],
-  ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
+  ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/client-dev-local.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
   ['/as/.well-known/oauth-authorization-server', GET],
 ]);
 // Express matches routes case-insensitively and ignores one trailing slash, so the 405 table does the same: GET and POST to the same spelling of a path
@@ -171,6 +171,23 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     });
   });
 
+  // The document the local client.dev clone presents (direction 1 "client-dev-local" preset). Same shape,
+  // the clone's patched client_id and redirect. PingFederate fetches it from here through the TLS front.
+  app.get('/client-dev-local.json', (req, res) => {
+    const clientId = CLIENT_DEV_LOCAL.clientId(env);
+    const redirectUri = CLIENT_DEV_LOCAL.redirectUri(env);
+    if (!clientId || !redirectUri) return res.status(404).json({ error: 'not_configured' });
+    res.set('Cache-Control', 'public, max-age=60').json({
+      client_id: clientId,
+      client_name: 'client.dev (local clone)',
+      client_uri: 'https://client.dev',
+      redirect_uris: [redirectUri],
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none',
+    });
+  });
+
   // Rule 19: what the build is, and POST /api/mode {source:"mock"|"real"} switches at runtime. Hosted copies
   // stay in mock (403); Real without the sign-in client answers 409 with the how-to.
   app.get('/api/info', (req, res) => {
@@ -238,6 +255,11 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
       pfBase: pf.base,
       ownClientIdConfigured: Boolean(pf.ownClientId),
       clientDev: CLIENT_DEV,
+      clientDevLocalConfigured: Boolean(CLIENT_DEV_LOCAL.clientId(env) && CLIENT_DEV_LOCAL.redirectUri(env)),
+      clientDevLocal: {
+        clientId: CLIENT_DEV_LOCAL.clientId(env) || null,
+        redirectUri: CLIENT_DEV_LOCAL.redirectUri(env) || null,
+      },
       issuer: `${origin}/as`,
       customer: publicConfig(customer),
       fixtures: Object.entries(FIXTURES).map(([name, fixture]) => ({ name, title: fixture.title, rule: fixture.rule })),
@@ -315,6 +337,11 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
       let clientId;
       let redirectUri;
       if (preset === 'client.dev') ({ clientId, redirectUri } = CLIENT_DEV);
+      else if (preset === 'client-dev-local') {
+        clientId = CLIENT_DEV_LOCAL.clientId(env);
+        redirectUri = CLIENT_DEV_LOCAL.redirectUri(env);
+        if (!clientId || !redirectUri) return res.status(409).json({ error: 'client_dev_local_not_configured', detail: 'Set CIMD_CLIENT_DEV_LOCAL_URL and CIMD_CLIENT_DEV_LOCAL_REDIRECT to the local client.dev clone\'s document URL and callback (see README "Run the real client.dev locally")' });
+      }
       else if (preset === 'own') {
         if (!pf.ownClientId || !pf.ownRedirectUri) return res.status(409).json({ error: 'own_client_not_configured', detail: 'Set CIMD_CLIENT_ID_URL and CIMD_REDIRECT_URI to a public https address PingFederate can reach' });
         ({ ownClientId: clientId, ownRedirectUri: redirectUri } = pf);

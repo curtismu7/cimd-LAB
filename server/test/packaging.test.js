@@ -119,7 +119,7 @@ test('deploy with approval applies nothing when a later file has a leftover toke
   const bin = path.join(tmp, 'bin');
   fs.mkdirSync(bin);
   const log = path.join(tmp, 'kubectl.log');
-  fs.writeFileSync(path.join(bin, 'kubectl'), `#!/bin/sh\necho "$@" >> "${log}"\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'kubectl'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\n`, { mode: 0o755 });
   const run = (scriptRoot, extra = {}) => spawnSync('bash', [path.join(scriptRoot, 'scripts/deploy-se.sh')], {
     env: { PATH: `${bin}:${process.env.PATH}`, HOME: os.tmpdir(), OWNER_APPROVED: '1', ...VALUES, ...extra }, encoding: 'utf8',
   });
@@ -198,7 +198,7 @@ test('CI: GitHub-hosted runners, checkout v5, Node 26 only, build, test, doctor,
   assert.doesNotMatch(ci, /self-hosted/);
   assert.match(ci, /runs-on: \$\{\{ fromJSON\(vars\.RUNS_ON \|\| '\["ubuntu-latest"\]'\) \}\}/); // hosted by default; a repo variable can point the jobs at a local runner
   assert.deepEqual([...new Set([...ci.matchAll(/node-version: (\S+)/g)].map((m) => m[1]))], ['26']);
-  for (const needle of ['npm run build', 'npm test', 'npm run doctor', 'validate-content-pack.mjs', 'gitleaks detect', 'FORBIDDEN_STRINGS']) assert.ok(ci.includes(needle), needle);
+  for (const needle of ['npm run build', 'node --test', 'vitest run', 'npm run doctor', 'validate-content-pack.mjs', 'gitleaks detect', 'FORBIDDEN_STRINGS']) assert.ok(ci.includes(needle), needle);
   for (const job of ['build:', 'test:', 'doctor:', 'forbidden-strings:', 'gitleaks:']) assert.ok(ci.includes(`\n  ${job}`), job);
 });
 
@@ -241,7 +241,9 @@ function runStartScript(extraFiles = {}) {
 async function startAndAsk(tmp, script) {
   const port = await freePort();
   // the script exactly as package.json writes it, in a folder that has (or lacks) a .env
-  const child = spawn('sh', ['-c', script], { cwd: tmp, env: { PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`, HOME: os.tmpdir(), PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] });
+  // detached + a group kill: `sh -c` spawns node as a grandchild, and killing only sh orphans it — the orphan keeps
+  // the stdio pipes open and node --test never exits (the CI hang). A group kill takes the whole tree down.
+  const child = spawn('sh', ['-c', script], { cwd: tmp, detached: true, env: { PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`, HOME: os.tmpdir(), PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   child.stdout.on('data', (c) => { out += c; });
   child.stderr.on('data', (c) => { out += c; });
@@ -256,7 +258,10 @@ async function startAndAsk(tmp, script) {
     }
     return { health: null, exited, out };
   } finally {
+    try { if (child.pid) process.kill(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
     child.kill('SIGTERM');
+    child.stdout.destroy();
+    child.stderr.destroy();
     await new Promise((resolve) => { child.once('exit', resolve); setTimeout(resolve, 2000); });
   }
 }

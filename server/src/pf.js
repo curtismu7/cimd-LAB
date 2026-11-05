@@ -11,6 +11,14 @@ export const CLIENT_DEV = {
   redirectUri: 'https://client.dev/oauth/callback',
 };
 
+// A local clone of stytchauth/client.dev (MIT) run by the operator, patched to present a document this
+// lab serves (so PingFederate can fetch it and the redirect lands back on the clone). The lab never
+// fetches these either; PingFederate does. See README "Run the real client.dev locally".
+export const CLIENT_DEV_LOCAL = {
+  clientId: (env = process.env) => (env.CIMD_CLIENT_DEV_LOCAL_URL || '').trim(),
+  redirectUri: (env = process.env) => (env.CIMD_CLIENT_DEV_LOCAL_REDIRECT || '').trim(),
+};
+
 export function pfSettings(env = process.env) {
   return {
     // No default on purpose: with PF_BASE_URL unset, direction 1 is off and nothing is ever requested.

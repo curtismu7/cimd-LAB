@@ -171,12 +171,38 @@ test('own-client probe needs configuration; PF_BASE_URL must be https', async ()
   try {
     const own = await fetch(`${lab.base}/api/pf/probe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset: 'own', confirm: true }) });
     assert.equal(own.status, 409);
+    // The client-dev-local preset is its own 409 until its settings exist.
+    const local = await fetch(`${lab.base}/api/pf/probe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset: 'client-dev-local', confirm: true }) });
+    assert.equal(local.status, 409);
+    assert.match((await local.json()).error, /client_dev_local_not_configured/);
+    assert.equal((await fetch(`${lab.base}/client-dev-local.json`)).status, 404);
   } finally { await lab.close(); }
   const insecure = await start({ PF_BASE_URL: 'http://pf.example:9031' }, () => assert.fail('must not be contacted'));
   try {
     assert.equal((await fetch(`${insecure.base}/api/pf/status`)).status, 400);
     assert.deepEqual(insecure.attempts, []);
   } finally { await insecure.close(); }
+});
+
+test('client-dev-local: the preset probes the clone\'s document URL and the lab serves its document', async () => {
+  const DOC = 'https://lab.example:5251/client-dev-local.json';
+  const REDIRECT = 'https://lab.example:5251/callback';
+  const lab = await start({ CIMD_CLIENT_DEV_LOCAL_URL: DOC, CIMD_CLIENT_DEV_LOCAL_REDIRECT: REDIRECT }, (url) => {
+    if (url.searchParams.get('client_id') === DOC) return new Response('', { status: 302, headers: { location: `${REDIRECT}?code=c&state=s` } });
+    return new Response('Invalid client_id', { status: 400 });
+  });
+  try {
+    const doc = await (await fetch(`${lab.base}/client-dev-local.json`)).json();
+    assert.equal(doc.client_id, DOC);
+    assert.deepEqual(doc.redirect_uris, [REDIRECT]);
+    assert.equal(doc.token_endpoint_auth_method, 'none');
+    const config = await (await fetch(`${lab.base}/api/config`)).json();
+    assert.equal(config.clientDevLocalConfigured, true);
+    assert.equal(config.clientDevLocal.clientId, DOC);
+    const probe = await (await fetch(`${lab.base}/api/pf/probe`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset: 'client-dev-local', confirm: true }) })).json();
+    assert.equal(probe.verdict, 'accepted');
+    assert.equal(probe.location, REDIRECT);
+  } finally { await lab.close(); }
 });
 
 test('a redirect to the client with an error is not reported as accepted', async () => {
