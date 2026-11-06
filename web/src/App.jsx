@@ -93,7 +93,6 @@ export default function App() {
     setResetKey((k) => k + 1);
     setResetNote(r.ok ? 'Reset: server state cleared and diagram positions restored.' : 'Diagram positions restored; the server reset call failed.');
   };
-  const nextTheme = { auto: 'light', light: 'dark', dark: 'auto' }[theme] ?? 'auto';
   // ARIA tab pattern: one tab in the tab order, arrows/Home/End move focus and select.
   const onTabKeyDown = (event) => {
     const here = TABS.findIndex((t) => t.id === tab);
@@ -128,7 +127,13 @@ export default function App() {
           <div className="actions">
             <ShelfLink />
             <button type="button" onClick={reset}>Reset</button>
-            <button type="button" onClick={() => setTheme(nextTheme)} aria-label={`Theme: ${theme}. Switch to ${nextTheme}`}>Theme: {theme}</button>
+            <label className="inline">Theme
+              <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
+                <option value="auto">Auto</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
           </div>
         )}
         <button type="button" aria-pressed={presenter} aria-keyshortcuts="P Escape" title="Keys: P toggles, Esc leaves" onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
