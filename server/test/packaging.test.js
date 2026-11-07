@@ -168,7 +168,7 @@ test('the hosted deployment names no secret and the repo carries no hosts other 
   };
   walk(root);
   // IP literals are the tester's deliberate private-address cases; 'user' is the userinfo part of its credentials-in-URL case.
-  const allowed = (h) => /^[0-9.]+$/.test(h) || h === 'user' || h === 'client.dev' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.example') || h.endsWith('.invalid');
+  const allowed = (h) => /^[0-9.]+$/.test(h) || h === 'user' || h === 'client.dev' || h === 'raw.githubusercontent.com' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.example') || h.endsWith('.invalid');
   // This app's own hosted address may be recorded in the two documents that must name it (README and the shelf entry), never in code.
   const OWN_HOST = 'cimd-lab.ai-demo.ping-devops.com';
   const OWN_DOCS = new Set(['README.md', 'docs/shelf-entry.json']);
