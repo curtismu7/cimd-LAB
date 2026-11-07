@@ -137,7 +137,7 @@ th { color: var(--text); }
 }
 .mode-toggle { display: inline-flex; gap: 6px; }
 .mode-toggle button[aria-pressed='true'] { font-weight: 700; text-decoration: underline; }
-.real-signin { max-width: 40rem; margin: 12px auto; padding: 12px 16px; border: 1px solid var(--border, #ccc); border-radius: 8px; }
+.real-signin { max-width: 40rem; margin: 12px auto; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; }
 .real-signin form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
 
 /* Per-edge phase colors (owner, 2026-11-03): a colored line per flow phase, from the shared --dg-* tokens. */
