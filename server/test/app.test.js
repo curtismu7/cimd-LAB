@@ -25,6 +25,17 @@ async function start(env = {}, pfReply) {
   return { base, port, attempts, close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }) };
 }
 
+test('GET /api/shelf answers with the configured SHELF_URL (no web build needed) and is GET only', async () => {
+  const lab = await start({ SHELF_URL: 'https://shelf.example:8443/' });
+  try {
+    const r = await fetch(`${lab.base}/api/shelf`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await r.json(), { shelfUrl: 'https://shelf.example:8443' });
+    assert.notEqual((await fetch(`${lab.base}/api/shelf`, { method: 'POST' })).status, 200);
+  } finally { await lab.close(); }
+});
+
 test('health follows demo-health/1', async () => {
   const lab = await start();
   try {
