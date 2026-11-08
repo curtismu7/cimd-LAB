@@ -137,7 +137,14 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     if (req.method === 'GET' || req.method === 'HEAD') return next();
     const sent = req.headers.origin;
     // A browser always sends Origin on a cross-site write; tools such as the tester send none.
-    if (sent && sent !== origin && sent !== `http://localhost:${port}` && sent !== publicOrigin) return res.status(403).json({ error: 'cross-origin write refused' });
+    // Behind the lab-proxy the browser's Origin is the proxy's (the proxy's own name, not this lab's) while Host is this lab's own name.
+    // The proxy sets X-Forwarded-Host/-Proto; they are believed only when Host is a LAB_ALLOWED_HOSTS name (loopback and PUBLIC_HOST
+    // do not count), so a request that did not come through the proxy cannot use them.
+    const xfh = String(req.headers['x-forwarded-host'] || '').trim().toLowerCase();
+    const xfp = String(req.headers['x-forwarded-proto'] || 'https').trim().toLowerCase();
+    const proxied = sent && localExtra.includes(String(req.headers.host ?? '').replace(/:\d+$/, '').toLowerCase()) && xfh !== ''
+      && (xfp === 'https' || xfp === 'http') && sent === `${xfp}://${xfh}` && String(req.headers['sec-fetch-site'] || '').toLowerCase() !== 'cross-site';
+    if (sent && sent !== origin && sent !== `http://localhost:${port}` && sent !== publicOrigin && !proxied) return res.status(403).json({ error: 'cross-origin write refused' });
     next();
   });
 

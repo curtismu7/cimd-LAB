@@ -180,3 +180,36 @@ test('local mode: the extra limits do not apply', async () => {
     for (let i = 0; i < 6; i += 1) assert.equal((await fetch(`${lab.base}/api/reset`, { method: 'POST' })).status, 200);
   } finally { await lab.close(); }
 });
+
+test('behind the lab-proxy: a write is accepted only with the proxy\'s forwarded origin AND a LAB_ALLOWED_HOSTS Host', async () => {
+  const PROXY_HOST = 'cimd-lab.local.ping-devops.com';
+  const ORIGIN = 'https://local.ping-devops.com:8443';
+  const fwd = { 'x-forwarded-host': 'local.ping-devops.com:8443', 'x-forwarded-proto': 'https' };
+  const lab = await start({ PF_BASE_URL: PF, LAB_ALLOWED_HOSTS: PROXY_HOST });
+  try {
+    const post = (headers, host = `${PROXY_HOST}:${lab.port}`) => raw(lab.port, { method: 'POST', path: '/api/reset', headers: { host, ...headers } });
+    // what the browser and the proxy really send for a same-origin POST
+    assert.equal((await post({ ...fwd, origin: ORIGIN, 'sec-fetch-site': 'same-origin' })).status, 200);
+    assert.equal((await post({ ...fwd, origin: ORIGIN })).status, 200);
+    assert.equal((await post({ 'x-forwarded-host': 'local.ping-devops.com:8443', origin: ORIGIN })).status, 200, 'proto defaults to https');
+    // refused: a foreign origin, a mismatched forwarded host, a wrong scheme, a cross-site fetch, no forwarded host at all
+    for (const headers of [
+      { ...fwd, origin: 'https://evil.example' },
+      { ...fwd, origin: 'https://local.ping-devops.com:9999' },
+      { ...fwd, origin: 'http://local.ping-devops.com:8443' },
+      { ...fwd, origin: ORIGIN, 'sec-fetch-site': 'cross-site' },
+      { origin: ORIGIN },
+      { 'x-forwarded-host': 'evil.example', 'x-forwarded-proto': 'https', origin: ORIGIN },
+      { ...fwd, 'x-forwarded-proto': 'ftp', origin: 'ftp://local.ping-devops.com:8443' },
+    ]) assert.equal((await post(headers)).status, 403, JSON.stringify(headers));
+    // the forwarded headers are not believed on a loopback Host
+    for (const host of [`127.0.0.1:${lab.port}`, `localhost:${lab.port}`]) assert.equal((await post({ ...fwd, origin: ORIGIN }, host)).status, 403, host);
+  } finally { await lab.close(); }
+  // without LAB_ALLOWED_HOSTS the proxy Host is refused outright; with MODE=hosted the PUBLIC_HOST does not unlock forwarded headers
+  const plain = await start({ PF_BASE_URL: PF });
+  const hosted = await start(HOSTED);
+  try {
+    assert.equal((await raw(plain.port, { method: 'POST', path: '/api/reset', headers: { host: `${PROXY_HOST}:${plain.port}`, ...fwd, origin: ORIGIN } })).status, 403);
+    assert.equal((await raw(hosted.port, { method: 'POST', path: '/api/reset', headers: { host: 'cimd-lab.example', ...fwd, origin: ORIGIN } })).status, 403);
+  } finally { await plain.close(); await hosted.close(); }
+});
