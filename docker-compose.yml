@@ -6,7 +6,7 @@ services:
     ports:
       - "127.0.0.1:5250:5250"
     environment:
-      SHELF_URL: ${SHELF_URL:-}
+      SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
       BIND: "0.0.0.0"   # inside the container only; the Host check still accepts loopback names only
       PORT: "5250"
       PF_BASE_URL: "${PF_BASE_URL:-}"   # empty = direction 1 off; nothing is contacted

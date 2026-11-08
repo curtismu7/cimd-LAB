@@ -372,9 +372,11 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     res.json({ ok: true });
   });
 
+  // The header "Shelf" button. Outside the web-build check below (it was unreachable without a build).
+  app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo(env)); });
+
   // The built web UI, when it exists. Registered last so it never shadows an API route.
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
-app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.use(express.static(webDist));
     // Only an address with no file extension and outside /assets/ is a page; a missing file (/assets/x.js, /favicon.ico, /robots.txt) is a JSON 404.
     app.get(PAGE_PATH, (req, res) => res.sendFile(path.join(webDist, 'index.html')));
