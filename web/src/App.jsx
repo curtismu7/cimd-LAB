@@ -8,6 +8,8 @@ import TalkTrack from './views/TalkTrack.jsx';
 import Stories from './views/Stories.jsx';
 import H2View from './views/H2View.jsx';
 import ShelfLink from "./components/ShelfLink.jsx";
+// Opened from Customer Agent LAB (UC43 routes here): strip + header Back only; no tab or vertical is preselected.
+import ReturnLink from "./return-link/ReturnLink.jsx";
 
 export const TABS = [
   { id: 'learn', label: 'Learn', View: Learn },
@@ -119,12 +121,14 @@ export default function App() {
   return (
     <div className={`app${presenter ? ' presenter' : ''}`}>
       <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER} {RELEASE_BANNER}</div>
+      <ReturnLink app="cimd" />
       <header className="bar">
         <h1>{customer.name}</h1>
         <span className="mode" data-testid="mode">{tab === 'h2' ? MODE_H2 : MODE_PF}</span>
         {info && !hosted && tab !== 'h2' && <ModeToggle mode={info.source} realAvailable={info.realAvailable !== false} onChange={changeMode} />}
         {!presenter && (
           <div className="actions">
+            <ReturnLink app="cimd" variant="header" />
             <ShelfLink />
             <button type="button" onClick={reset}>Reset</button>
             <label className="inline">Theme
