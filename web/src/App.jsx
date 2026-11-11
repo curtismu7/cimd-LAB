@@ -60,7 +60,7 @@ export default function App() {
   }, []);
 
   // Branding from the server's validated customer config. Only a #rrggbb value is ever set as a colour. The page's own colours come from the shared
-  // stylesheet; the customer's accent is used only as a decorative edge of the header (--cust-accent).
+  // stylesheet; the customer's accent is used only as a decorative edge of the brand in the shell bar (--cust-accent-dark, the variant for the dark bar).
   useEffect(() => {
     const root = document.documentElement.style;
     const hex = /^#[0-9a-f]{6}$/i;
@@ -118,74 +118,82 @@ export default function App() {
 
   const Active = TABS.find((t) => t.id === tab).View;
 
+  const tablist = !presenter ? (
+    <nav className="shell-nav" role="tablist" aria-label="Views" onKeyDown={onTabKeyDown}>
+      {TABS.map((t) => (
+        <button
+          key={t.id}
+          ref={(node) => { tabRefs.current[t.id] = node; }}
+          id={`tab-${t.id}`}
+          type="button"
+          role="tab"
+          aria-selected={tab === t.id}
+          aria-controls="tabpanel"
+          tabIndex={tab === t.id ? 0 : -1}
+          onClick={() => setTab(t.id)}
+        >{t.label}</button>
+      ))}
+    </nav>
+  ) : (
+    <nav className="shell-nav presenter-tabs" aria-label="Views">
+      {TABS.map((t) => (
+        <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
+      ))}
+    </nav>
+  );
+
   return (
     <div className={`app${presenter ? ' presenter' : ''}`}>
-      <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER} {RELEASE_BANNER}</div>
-      <ReturnLink app="cimd" />
-      <header className="bar">
-        <h1>{customer.name}</h1>
-        <span className="mode" data-testid="mode">{tab === 'h2' ? MODE_H2 : MODE_PF}</span>
-        {info && !hosted && tab !== 'h2' && <ModeToggle mode={info.source} realAvailable={info.realAvailable !== false} onChange={changeMode} />}
-        {!presenter && (
-          <div className="actions">
-            <ReturnLink app="cimd" variant="header" />
-            <ShelfLink />
-            <button type="button" onClick={reset}>Reset</button>
-            <label className="inline">Theme
-              <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
-                <option value="auto">Auto</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
-          </div>
+      <header className="shell-bar">
+        <span className="shell-brand">
+          <span className="shell-logo" aria-hidden="true">P</span>
+          <h1>{customer.name}</h1>
+        </span>
+        <span className="shell-right">
+          {info && !hosted && tab !== 'h2' && <ModeToggle mode={info.source} realAvailable={info.realAvailable !== false} onChange={changeMode} />}
+          {!presenter && (
+            <>
+              <ReturnLink app="cimd" variant="header" />
+              <ShelfLink />
+              <button type="button" onClick={reset}>Reset</button>
+              <label className="shell-theme">Theme
+                <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
+                  <option value="auto">Auto</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </label>
+            </>
+          )}
+          <button type="button" aria-pressed={presenter} aria-keyshortcuts="P Escape" title="Keys: P toggles, Esc leaves" onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
+        </span>
+        {tablist}
+        {!presenter && info && info.source === 'real' && realAuth.checked && realAuth.available && !realAuth.subject && (
+          <section className="shell-signin" aria-labelledby="real-signin-h">
+            <h2 id="real-signin-h">Sign in with PingFederate</h2>
+            <p>A real pi.flow login runs server-side against the PingFederate named by PF_BASE_URL. The lab shows the subject and keeps no token.</p>
+            <form onSubmit={(e) => { e.preventDefault(); realSignIn(e.target.username.value, e.target.password.value); }} aria-label="Real sign-in">
+              <label className="inline">Username<input name="username" type="text" autoComplete="username" required maxLength={256} /></label>
+              <label className="inline">Password<input name="password" type="password" autoComplete="current-password" required maxLength={1024} /></label>
+              <button type="submit">Sign in</button>
+            </form>
+            {realAuth.problem && <p role="alert">{realAuth.problem}</p>}
+          </section>
         )}
-        <button type="button" aria-pressed={presenter} aria-keyshortcuts="P Escape" title="Keys: P toggles, Esc leaves" onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
-        {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
       </header>
-      {!presenter && info && info.source === 'real' && realAuth.checked && realAuth.available && !realAuth.subject && (
-        <section className="real-signin" aria-labelledby="real-signin-h">
-          <h2 id="real-signin-h">Sign in with PingFederate</h2>
-          <p>A real pi.flow login runs server-side against the PingFederate named by PF_BASE_URL. The lab shows the subject and keeps no token.</p>
-          <form onSubmit={(e) => { e.preventDefault(); realSignIn(e.target.username.value, e.target.password.value); }} aria-label="Real sign-in">
-            <label className="inline">Username<input name="username" type="text" autoComplete="username" required maxLength={256} /></label>
-            <label className="inline">Password<input name="password" type="password" autoComplete="current-password" required maxLength={1024} /></label>
-            <button type="submit" className="primary">Sign in</button>
-          </form>
-          {realAuth.problem && <p role="alert">{realAuth.problem}</p>}
-        </section>
-      )}
-      {!presenter && info && info.source === 'real' && realAuth.subject && (
-        <p className="banner" role="status">Signed in as <strong>{realAuth.subject}</strong> through real PingFederate pi.flow.</p>
-      )}
-      {!presenter && (
-        <nav className="tabs" role="tablist" aria-label="Views" onKeyDown={onTabKeyDown}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              ref={(node) => { tabRefs.current[t.id] = node; }}
-              id={`tab-${t.id}`}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              aria-controls="tabpanel"
-              tabIndex={tab === t.id ? 0 : -1}
-              onClick={() => setTab(t.id)}
-            >{t.label}</button>
-          ))}
-        </nav>
-      )}
-      {presenter && (
-        <nav className="tabs presenter-tabs" aria-label="Views">
-          {TABS.map((t) => (
-            <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
-          ))}
-        </nav>
-      )}
-      <p className="sr-only" role="status">{resetNote}</p>
-      <main id="tabpanel" {...(presenter ? {} : { role: 'tabpanel', 'aria-labelledby': `tab-${tab}` })}>
-        <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} />
-      </main>
+      <div className="page">
+        <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER} {RELEASE_BANNER}</div>
+        <ReturnLink app="cimd" />
+        <p className="mode" data-testid="mode">{tab === 'h2' ? MODE_H2 : MODE_PF}</p>
+        {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
+        {!presenter && info && info.source === 'real' && realAuth.subject && (
+          <p className="banner" role="status">Signed in as <strong>{realAuth.subject}</strong> through real PingFederate pi.flow.</p>
+        )}
+        <p className="sr-only" role="status">{resetNote}</p>
+        <main id="tabpanel" {...(presenter ? {} : { role: 'tabpanel', 'aria-labelledby': `tab-${tab}` })}>
+          <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} />
+        </main>
+      </div>
     </div>
   );
 }

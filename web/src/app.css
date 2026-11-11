@@ -1,14 +1,28 @@
 /* App layout only. Colours, fonts, controls and the dark theme come from standalone-ui.css (loaded first). Tokens only here:
    no colour literals, no dark-mode media queries, no forced priority, breakpoints 600px and 900px only. */
 :root { --scale: 1; }
-.app { font-size: calc(14px * var(--scale)); min-height: 100vh; max-width: 1200px; margin: 0 auto; padding-bottom: 48px; }
+.app { font-size: calc(14px * var(--scale)); min-height: 100vh; padding-bottom: 48px; }
+.page { max-width: 1100px; margin: 0 auto; min-width: 0; }
 .app.presenter { --scale: 1.3; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px 0 12px 12px; border-left: 4px solid var(--cust-accent, var(--accent)); margin-top: 12px; }
-.bar h1 { margin: 0; font-size: 1.4em; }
-.mode { color: var(--muted); font-size: 0.9em; flex: 1 1 240px; }
-.actions { display: flex; gap: 8px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 8px; }
+/* App shell (STANDALONE-UI-PATTERNS.md section 1): Core Dark bar in both themes, Ping Red gradient rule. The bar bleeds to the window edge
+   (the body pads 16px). Brand and the right-hand controls share the first row; the six view tabs get a row of their own. */
+.shell-bar { display: flex; align-items: center; gap: 0.5rem 1rem; flex-wrap: wrap; padding: 0.6rem 1.25rem; margin: 0 -16px;
+  background: var(--box-dark); color: var(--on-box); border-bottom: 3px solid transparent; border-image: var(--accent-gradient) 1; }
+.shell-brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.02em; padding-left: 0.6rem; border-left: 4px solid var(--cust-accent-dark, var(--accent)); }
+.shell-brand h1 { margin: 0; font-size: 1.1rem; color: var(--on-box); }
+.shell-logo { width: 1.9rem; height: 1.9rem; border-radius: 4px; background: var(--accent-gradient); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; }
+.shell-right { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-left: auto; font-size: 0.85rem; }
+.shell-right button, .shell-right .shelf-link { min-height: 32px; padding: 4px 10px; }
+.shell-right .shell-theme { color: var(--on-box); }
+.shell-bar :focus-visible { outline: 3px solid var(--on-box); outline-offset: 2px; }
+.shell-right .mode-toggle { margin: 0; }
+.shell-nav { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; flex: 1 1 100%; }
+.shell-nav button { min-height: 32px; padding: 4px 12px; border-radius: 999px; }
+@media (max-width: 600px) {
+  .shell-bar { gap: 0.6rem; padding: 0.6rem 1rem; }
+}
+.mode { color: var(--muted); font-size: 0.9em; margin: 12px 0 0; }
 main { padding: 0 0 24px; }
 h2 { margin-top: 8px; }
 h3 { margin-top: 28px; }
@@ -69,7 +83,7 @@ th { color: var(--text); }
 .dg-steps li.current > button { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .dg-steps button { margin: 4px 0; }
 .talk h2 { font-size: 1.6em; }
-.tagline { color: var(--muted); margin: 0; flex: 1 1 100%; font-size: 0.95em; }
+.tagline { color: var(--muted); margin: 4px 0 0; font-size: 0.95em; }
 .story-pick { margin: 8px 0 16px; }
 .story-pick legend { font-weight: 700; padding: 0 4px; }
 /* Story text carries long unbreakable client URLs; without this they push the page wider than a phone (375px). */
@@ -137,8 +151,13 @@ th { color: var(--text); }
 }
 .mode-toggle { display: inline-flex; gap: 6px; }
 .mode-toggle button[aria-pressed='true'] { font-weight: 700; text-decoration: underline; }
-.real-signin { max-width: 40rem; margin: 12px auto; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; }
-.real-signin form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+/* The real pi.flow sign-in is shell content (standard section 1: sign-in on the shell bar): its own row at the bottom of the bar. */
+.shell-signin { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.shell-signin h2 { margin: 0; font-size: 0.95rem; color: var(--on-box); }
+.shell-signin p { margin: 0; font-size: 0.85rem; flex: 1 1 100%; }
+.shell-signin form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.shell-signin label.inline { color: var(--on-box); margin: 0; }
+.shell-signin [role="alert"] { color: var(--danger-text); background: var(--accent-soft); border: 1px solid var(--danger-text); border-radius: 8px; padding: 6px 10px; flex: 0 1 auto; }
 
 /* Per-edge phase colors (owner, 2026-11-03): a colored line per flow phase, from the shared --dg-* tokens. */
 .edge-red .react-flow__edge-path { stroke: var(--dg-red); }
