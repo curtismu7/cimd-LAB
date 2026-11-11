@@ -120,7 +120,9 @@ export default function Learn({ resetKey }) {
           </section>
         ))}
       </div>
-      <DiagramView id="cimd-vs-dcr" resetKey={resetKey} />
+      <DiagramView id="cimd-vs-dcr" resetKey={resetKey}>
+        {(simulate) => <button type="button" className="primary" onClick={simulate}>Simulate</button>}
+      </DiagramView>
 
       <h3>What CIMD does not fix</h3>
       <ul className="problem">
