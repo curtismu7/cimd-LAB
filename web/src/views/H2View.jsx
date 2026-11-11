@@ -124,7 +124,8 @@ function MockTable({ table, info, onLoad }) {
 const toForm = (input) => ({ ...input, allowlist: input.allowlist.join('\n') });
 const fromForm = (form) => ({ ...form, allowlist: form.allowlist.split('\n').filter((line) => line.trim() !== ''), attempts: Number(form.attempts) });
 
-function LiveForm({ info, form, setForm, onRun, busy }) {
+// children = the submit button: the view places its own primary action (the Mock view's primary is the diagram's Simulate instead).
+function LiveForm({ info, form, setForm, onRun, children }) {
   const id = useId();
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const check = (key, label) => (
@@ -162,7 +163,7 @@ function LiveForm({ info, form, setForm, onRun, busy }) {
       <label htmlFor={`${id}-attempts`}>Fresh connections in this run ({info.limits.minAttempts} to {info.limits.maxAttempts})</label>
       <input id={`${id}-attempts`} type="number" min={info.limits.minAttempts} max={info.limits.maxAttempts} value={form.attempts} onChange={(e) => set('attempts', e.target.value)} />
       <p className="hint">Text you type is echoed back only after a best-effort mask for credential-shaped values. That is a heuristic, not a guarantee. A value still percent-encoded after three decoding rounds is masked whole. Do not type real credentials.</p>
-      <button type="submit" className="primary" disabled={busy}>Evaluate</button>
+      {children}
     </form>
   );
 }
@@ -250,20 +251,28 @@ function H2Body({ resetKey, presenter }) {
             </dl>
           </section>
 
-          <DiagramView id="gateway-cimd-preference" resetKey={resetKey} presenter={presenter} />
-
           {mode === 'mock' ? (
-            <section className="card" aria-labelledby="h2-mock">
-              <h3 id="h2-mock">Mock: scripted scenarios</h3>
-              <MockTable table={table} info={info} onLoad={load} />
-            </section>
+            <div>
+              <DiagramView id="gateway-cimd-preference" resetKey={resetKey} presenter={presenter}>
+                {(simulate) => <button type="button" className="primary" onClick={simulate}>Simulate</button>}
+              </DiagramView>
+              <section className="card" aria-labelledby="h2-mock">
+                <h3 id="h2-mock">Mock: scripted scenarios</h3>
+                <MockTable table={table} info={info} onLoad={load} />
+              </section>
+            </div>
           ) : (
-            <section className="card" aria-labelledby="h2-live">
-              <h3 id="h2-live">Live: run the local engine on your own inputs</h3>
-              <LiveForm info={info} form={form} setForm={setForm} onRun={evaluate} busy={busy} />
-              {run && !run.ok ? <p className="tone-bad" role="alert" data-testid="sim-error">Refused: <code>{String(run.data?.error ?? run.status)}</code>{run.data?.field ? <> in <code>{String(run.data.field)}</code></> : null}</p> : null}
-              {run?.ok ? <ResultView result={run.data} metadataTags={info.metadataTags} /> : null}
-            </section>
+            <div>
+              <DiagramView id="gateway-cimd-preference" resetKey={resetKey} presenter={presenter} />
+              <section className="card" aria-labelledby="h2-live">
+                <h3 id="h2-live">Live: run the local engine on your own inputs</h3>
+                <LiveForm info={info} form={form} setForm={setForm} onRun={evaluate}>
+                  <button type="submit" className="primary" disabled={busy}>Evaluate</button>
+                </LiveForm>
+                {run && !run.ok ? <p className="tone-bad" role="alert" data-testid="sim-error">Refused: <code>{String(run.data?.error ?? run.status)}</code>{run.data?.field ? <> in <code>{String(run.data.field)}</code></> : null}</p> : null}
+                {run?.ok ? <ResultView result={run.data} metadataTags={info.metadataTags} /> : null}
+              </section>
+            </div>
           )}
         </>
       ) : null}

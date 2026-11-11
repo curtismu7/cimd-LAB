@@ -23,7 +23,7 @@ function Validator() {
       <p>Checks a document against the lab's rules. Nothing is fetched and PingFederate is not contacted.</p>
       <label htmlFor="doc-text">Document JSON</label>
       <textarea id="doc-text" rows={10} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />
-      <button type="button" className="primary" onClick={run}>Validate</button>
+      <button type="button" onClick={run}>Validate</button>
       {out && (
         <div data-testid="validate-result" aria-live="polite">
           {out.data?.error && <p className="tone-bad">Could not validate: <code>{String(out.data.error)}</code></p>}
@@ -130,7 +130,7 @@ export default function PfView({ resetKey }) {
           allowlisted document, an unlisted one, and a request without PKCE. Every row is a
           measured note about <strong>PingFederate</strong> — never about the Ping MCP gateway.
         </p>
-        <button type="button" className="primary" onClick={runConformance} disabled={busy || notConfigured}>Run conformance</button>
+        <button type="button" onClick={runConformance} disabled={busy || notConfigured}>Run conformance</button>
         {conformance && !conformance.ok && !conformance.data?.results && (
           <p className="tone-bad" data-testid="conformance-error">Conformance refused: <code>{String(conformance.data?.error ?? conformance.status)}</code> {conformance.data?.detail ? String(conformance.data.detail) : ''}</p>
         )}

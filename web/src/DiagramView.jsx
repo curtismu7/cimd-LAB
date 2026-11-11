@@ -48,7 +48,10 @@ export function toFlow(diagram, positions, activeEdges, simulating) {
   return { nodes, edges };
 }
 
-export default function DiagramView({ id, resetKey = 0, presenter = false }) {
+// A view has exactly one primary button. The view that owns this diagram passes a function as children to render Simulate as ITS primary action:
+// <DiagramView ...>{(simulate) => <button type="button" className="primary" onClick={simulate}>Simulate</button>}</DiagramView>.
+// Without it Simulate is a plain button: most views have a bigger action of their own (run the probe, run the tester, evaluate).
+export default function DiagramView({ id, resetKey = 0, presenter = false, children }) {
   const diagram = useMemo(() => loadDiagram(id), [id]);
   const { positions, move, reset } = usePositions(diagram);
   const [s, dispatch] = useStepper(diagram.steps.length);
@@ -66,6 +69,7 @@ export default function DiagramView({ id, resetKey = 0, presenter = false }) {
     return () => observer.disconnect();
   }, []);
 
+  const simulate = () => dispatch({ type: 'simulate' });
   const doReset = useCallback(() => { reset(); dispatch({ type: 'stop' }); }, [reset, dispatch]);
   useEffect(() => { if (resetKey) doReset(); }, [resetKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -92,7 +96,7 @@ export default function DiagramView({ id, resetKey = 0, presenter = false }) {
       <h3>{diagram.title}</h3>
       <p className="lede">{diagram.lede}</p>
       <div className="dg-toolbar" role="toolbar" aria-label="Diagram controls">
-        <button type="button" className="primary" onClick={() => dispatch({ type: 'simulate' })}>Simulate</button>
+        {typeof children === 'function' ? children(simulate) : <button type="button" onClick={simulate}>Simulate</button>}
         <button type="button" onClick={() => dispatch({ type: 'prev' })}>Back</button>
         <button type="button" onClick={() => dispatch({ type: 'next' })}>Next</button>
         {s.paused
