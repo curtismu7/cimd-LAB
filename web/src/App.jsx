@@ -155,7 +155,8 @@ export default function App() {
           <h1>{customer.name}</h1>
         </span>
         <span className="shell-right">
-          <TopMenu
+          <span className="mode-toggle" style={{ display: "contents" }}>
+            <TopMenu
             mode={info && !hosted && tab !== 'h2' ? { value: info.source === 'real' ? 'real' : 'mock', onChange: changeMode, realAvailable: info.realAvailable !== false } : undefined}
             theme={{ value: theme, onChange: setTheme }}
             fontSize={{ value: fontStep, onChange: setFontStep }}
@@ -168,6 +169,7 @@ export default function App() {
           >
             {!presenter && <ShelfLink />}
           </TopMenu>
+          </span>
         </span>
         {tablist}
         {!presenter && info && info.source === 'real' && realAuth.checked && realAuth.available && !realAuth.subject && (

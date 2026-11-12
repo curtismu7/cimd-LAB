@@ -27,148 +27,11 @@ const DOCUMENT_LABELS = {
 };
 const POLICY_LABELS = { refuse: 'Refuse', fall_back_to_dcr: 'Fall back to dynamic registration' };
 
-function Steps({ steps }) {
-  return (
-    <ol className="sim-steps">
-      {steps.map((step, index) => (
-        <li key={`${step.id}-${index}`} data-state={step.ok ? 'ok' : 'bad'}>
-          <p className="sim-steps__title"><strong>{step.title}</strong> <span className="sim-steps__state">{step.ok ? 'passed' : 'stopped here'}</span> <Tag tag={step.tag} /></p>
-          <p className="sim-steps__detail">{step.detail}</p>
-          {(step.notes ?? []).map((note, i) => (
-            <p className="sim-steps__detail" key={`note-${i}`}><Tag tag={note.tag} /> {note.text}</p>
-          ))}
-          {step.hop ? (
-            <details>
-              <summary>Hop: request and response</summary>
-              <p>traceparent: <code>{step.hop.traceparent}</code></p>
-              <pre>{`${step.hop.request}\n-> ${step.hop.response}`}</pre>
-            </details>
-          ) : null}
-          {step.document ? (
-            <details>
-              <summary>Simulated document</summary>
-              <pre>{JSON.stringify(step.document, null, 2)}</pre>
-            </details>
-          ) : null}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-const OUTCOME_TEXT = { cimd: 'Registered through CIMD (a document URL)', dcr: 'Registered through dynamic client registration' };
-
-export function ResultView({ result, metadataTags }) {
-  const s = result.summary;
-  const headline = s.outcome === 'registered' ? OUTCOME_TEXT[s.via] : `Refused: ${s.reason}`;
-  return (
-    <div className="sim-result" data-testid="sim-result" aria-live="polite">
-      <h4 className="sim-result__headline" data-state={s.outcome === 'registered' ? 'ok' : 'bad'}>{headline}</h4>
-      {s.fellBackFrom ? <p>Fell back to dynamic registration after the CIMD path stopped at <code>{s.fellBackFrom}</code> (the lab's own option, not a deck claim).</p> : null}
-      <dl className="sim-result__counts">
-        <dt>Attempts</dt><dd>{result.attempts.length}</dd>
-        <dt>Document fetches</dt><dd data-testid="count-fetches">{s.fetches}</dd>
-        <dt>Cache hits</dt><dd data-testid="count-cache-hits">{s.cacheHits}</dd>
-        <dt>Cached documents</dt><dd data-testid="count-cache-entries">{s.cacheEntries}</dd>
-        <dt>Dynamic registrations stored</dt><dd data-testid="count-dcr">{s.dcrRecords}</dd>
-      </dl>
-      <p className="sim-result__note"><Tag tag="lab reading" /> The counts are what this simulation did in this run, not a measurement of any gateway.</p>
-      <h5>Discovery metadata the gateway published in this scenario</h5>
-      <ul className="sim-meta">
-        {Object.entries(result.metadata).map(([key, value]) => (
-          <li key={key}><code>{key}</code>: <code>{JSON.stringify(value)}</code> <Tag tag={metadataTags[key] ?? 'lab-invented'} /></li>
-        ))}
-      </ul>
-      {result.attempts.map((attempt) => (
-        <details key={attempt.n} open={attempt.n === 1}>
-          <summary>Attempt {attempt.n}: {attempt.outcome === 'registered' ? `registered (${attempt.via})` : `refused (${attempt.reason})`}</summary>
-          <Steps steps={attempt.steps} />
-        </details>
-      ))}
-      <p className="sim-result__trace">Trace id for this run: <code>{result.traceId}</code></p>
-    </div>
-  );
-}
-
-function MockTable({ table, info, onLoad }) {
-  if (!table) return <p>Loading the Mock table.</p>;
-  return (
-    <div data-testid="mock-table">
-      <ul className="sim-cards">
-        {table.scenarios.map((scenario) => {
-          const s = scenario.result.summary;
-          return (
-            <li key={scenario.id} className="sim-cards__item" data-testid={`mock-row-${scenario.id}`}>
-              <h4 className="sim-cards__title">{scenario.title}</h4>
-              <p className="sim-cards__say">{scenario.say}</p>
-              <dl className="sim-cards__facts">
-                <dt>Outcome</dt><dd>{s.outcome === 'registered' ? `registered via ${s.via}` : `refused: ${s.reason}`}</dd>
-                <dt>Document fetches</dt><dd>{s.fetches}</dd>
-                <dt>Cache hits</dt><dd>{s.cacheHits}</dd>
-                <dt>Registrations stored</dt><dd>{s.dcrRecords}</dd>
-              </dl>
-              <details>
-                <summary>Steps of the first attempt</summary>
-                <Steps steps={scenario.result.attempts[0].steps} />
-              </details>
-              <button type="button" onClick={() => onLoad(scenario.input)}>Run this in Live</button>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="hint">{table.note} Metadata tags: {Object.entries(info.metadataTags).map(([k, v]) => `${k} (${v})`).join(', ')}.</p>
-    </div>
-  );
-}
 
 const toForm = (input) => ({ ...input, allowlist: input.allowlist.join('\n') });
 const fromForm = (form) => ({ ...form, allowlist: form.allowlist.split('\n').filter((line) => line.trim() !== ''), attempts: Number(form.attempts) });
 
 // children = the submit button: the view places its own primary action (the Mock view's primary is the diagram's Simulate instead).
-function LiveForm({ info, form, setForm, onRun, children }) {
-  const id = useId();
-  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-  const check = (key, label) => (
-    <label className="inline" key={key}><input type="checkbox" checked={form[key]} onChange={(e) => set(key, e.target.checked)} /> {label}</label>
-  );
-  return (
-    <form className="sim-form" noValidate onSubmit={(e) => { e.preventDefault(); onRun(); }}>
-      <fieldset>
-        <legend>The gateway</legend>
-        {check('gatewayAdvertisesCimd', 'Advertises CIMD in its discovery metadata')}
-        {check('gatewayOffersDcr', 'Offers dynamic client registration')}
-      </fieldset>
-      <fieldset>
-        <legend>The client</legend>
-        {check('clientSupportsCimd', 'Presents a document URL as its client_id')}
-        {check('clientSupportsDcr', 'Can register dynamically')}
-        <label htmlFor={`${id}-url`}>client_id URL</label>
-        <input id={`${id}-url`} type="text" value={form.clientIdUrl} maxLength={info.limits.maxUrlLength} onChange={(e) => set('clientIdUrl', e.target.value)} spellCheck={false} autoComplete="off" />
-        <label htmlFor={`${id}-doc`}>What the simulated web serves at that URL</label>
-        <select id={`${id}-doc`} value={form.document} onChange={(e) => set('document', e.target.value)}>
-          {info.documents.map((name) => <option key={name} value={name}>{DOCUMENT_LABELS[name] ?? name}</option>)}
-        </select>
-      </fieldset>
-      <fieldset>
-        <legend>The tenant</legend>
-        <label htmlFor={`${id}-allow`}>Allowlist: one whole document URL per line (up to {info.limits.maxAllowlist}; blank lines are ignored; compared exactly)</label>
-        <textarea id={`${id}-allow`} rows={3} value={form.allowlist} onChange={(e) => set('allowlist', e.target.value)} spellCheck={false} />
-      </fieldset>
-      <fieldset>
-        <legend>If the CIMD path fails after it was chosen <Tag tag="lab-invented" /></legend>
-        {info.failurePolicies.map((name) => (
-          <label className="inline" key={name}><input type="radio" name={`${id}-policy`} checked={form.onCimdFailure === name} onChange={() => set('onCimdFailure', name)} /> {POLICY_LABELS[name]}</label>
-        ))}
-      </fieldset>
-      <label htmlFor={`${id}-attempts`}>Fresh connections in this run ({info.limits.minAttempts} to {info.limits.maxAttempts})</label>
-      <input id={`${id}-attempts`} type="number" min={info.limits.minAttempts} max={info.limits.maxAttempts} value={form.attempts} onChange={(e) => set('attempts', e.target.value)} />
-      <p className="hint">Text you type is echoed back only after a best-effort mask for credential-shaped values. That is a heuristic, not a guarantee. A value still percent-encoded after three decoding rounds is masked whole. Do not type real credentials.</p>
-      {children}
-    </form>
-  );
-}
-
-// Reset (the header button) remounts the body: Mock mode, the form defaults, the result and the diagram positions all go back to the start.
 export default function H2View({ resetKey = 0, presenter = false }) {
   return <H2Body key={resetKey} resetKey={resetKey} presenter={presenter} />;
 }
@@ -211,8 +74,8 @@ function H2Body({ resetKey, presenter }) {
 
   return (
     <div className="view h2">
-      <h2>H2 2026: an MCP gateway that prefers CIMD client registration</h2>
       <div className="banner" role="note" data-testid="h2-banner">Ping release claim, UNVERIFIED on our tenant. From slide 36 of Ping's "ID4AI Workforce - H2 2026" deck (release dated 2026-11-02). It is not on our tenant. This tab is a local simulation, not PingFederate and not the Ping MCP gateway.</div>
+      <h2>H2 2026: an MCP gateway that prefers CIMD client registration</h2>
       {failed ? <p role="alert" className="tone-bad">The H2 2026 data could not be loaded.</p> : null}
       {!info && !failed ? <p>Loading.</p> : null}
       {info ? (
@@ -279,3 +142,110 @@ function H2Body({ resetKey, presenter }) {
     </div>
   );
 }
+
+function Steps({ steps }) {
+  return (
+    <ol className="sim-steps">
+      {steps.map((step, index) => (
+        <li key={`${step.id}-${index}`} data-state={step.ok ? 'ok' : 'bad'}>
+          <p className="sim-steps__title"><strong>{step.title}</strong> <span className="sim-steps__state">{step.ok ? 'passed' : 'stopped here'}</span> <Tag tag={step.tag} /></p>
+          <p className="sim-steps__detail">{step.detail}</p>
+          {(step.notes ?? []).map((note, i) => (
+            <p className="sim-steps__detail" key={`note-${i}`}><Tag tag={note.tag} /> {note.text}</p>
+          ))}
+          {step.hop ? (
+            <details>
+              <summary>Hop: request and response</summary>
+              <p>traceparent: <code>{step.hop.traceparent}</code></p>
+              <pre>{`${step.hop.request}\n-> ${step.hop.response}`}</pre>
+            </details>
+          ) : null}
+          {step.document ? (
+            <details>
+              <summary>Simulated document</summary>
+              <pre>{JSON.stringify(step.document, null, 2)}</pre>
+            </details>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+const OUTCOME_TEXT = { cimd: 'Registered through CIMD (a document URL)', dcr: 'Registered through dynamic client registration' };
+
+export function ResultView({ result, metadataTags }) {
+  const s = result.summary;
+  const headline = s.outcome === 'registered' ? OUTCOME_TEXT[s.via] : `Refused: ${s.reason}`;
+  return (
+    <div className="sim-result" data-testid="sim-result" aria-live="polite">
+      <h4 className="sim-result__headline" data-state={s.outcome === 'registered' ? 'ok' : 'bad'}>{headline}</h4>
+      {s.fellBackFrom ? <p>Fell back to dynamic registration after the CIMD path stopped at <code>{s.fellBackFrom}</code> (the lab's own option, not a deck claim).</p> : null}
+      <dl className="sim-result__counts">
+        <dt>Attempts</dt><dd>{result.attempts.length}</dd>
+        <dt>Document fetches</dt><dd data-testid="count-fetches">{s.fetches}</dd>
+        <dt>Cache hits</dt><dd data-testid="count-cache-hits">{s.cacheHits}</dd>
+        <dt>Cached documents</dt><dd data-testid="count-cache-entries">{s.cacheEntries}</dd>
+        <dt>Dynamic registrations stored</dt><dd data-testid="count-dcr">{s.dcrRecords}</dd>
+      </dl>
+      <p className="sim-result__note"><Tag tag="lab reading" /> The counts are what this simulation did in this run, not a measurement of any gateway.</p>
+      <h5>Discovery metadata the gateway published in this scenario</h5>
+      <ul className="sim-meta">
+        {Object.entries(result.metadata).map(([key, value]) => (
+          <li key={key}><code>{key}</code>: <code>{JSON.stringify(value)}</code> <Tag tag={metadataTags[key] ?? 'lab-invented'} /></li>
+        ))}
+      </ul>
+      {result.attempts.map((attempt) => (
+        <details key={attempt.n} open={attempt.n === 1}>
+          <summary>Attempt {attempt.n}: {attempt.outcome === 'registered' ? `registered (${attempt.via})` : `refused (${attempt.reason})`}</summary>
+          <Steps steps={attempt.steps} />
+        </details>
+      ))}
+      <p className="sim-result__trace">Trace id for this run: <code>{result.traceId}</code></p>
+    </div>
+  );
+}
+function LiveForm({ info, form, setForm, onRun, children }) {
+  const id = useId();
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const check = (key, label) => (
+    <label className="inline" key={key}><input type="checkbox" checked={form[key]} onChange={(e) => set(key, e.target.checked)} /> {label}</label>
+  );
+  return (
+    <form className="sim-form" noValidate onSubmit={(e) => { e.preventDefault(); onRun(); }}>
+      <fieldset>
+        <legend>The gateway</legend>
+        {check('gatewayAdvertisesCimd', 'Advertises CIMD in its discovery metadata')}
+        {check('gatewayOffersDcr', 'Offers dynamic client registration')}
+      </fieldset>
+      <fieldset>
+        <legend>The client</legend>
+        {check('clientSupportsCimd', 'Presents a document URL as its client_id')}
+        {check('clientSupportsDcr', 'Can register dynamically')}
+        <label htmlFor={`${id}-url`}>client_id URL</label>
+        <input id={`${id}-url`} type="text" value={form.clientIdUrl} maxLength={info.limits.maxUrlLength} onChange={(e) => set('clientIdUrl', e.target.value)} spellCheck={false} autoComplete="off" />
+        <label htmlFor={`${id}-doc`}>What the simulated web serves at that URL</label>
+        <select id={`${id}-doc`} value={form.document} onChange={(e) => set('document', e.target.value)}>
+          {info.documents.map((name) => <option key={name} value={name}>{DOCUMENT_LABELS[name] ?? name}</option>)}
+        </select>
+      </fieldset>
+      <fieldset>
+        <legend>The tenant</legend>
+        <label htmlFor={`${id}-allow`}>Allowlist: one whole document URL per line (up to {info.limits.maxAllowlist}; blank lines are ignored; compared exactly)</label>
+        <textarea id={`${id}-allow`} rows={3} value={form.allowlist} onChange={(e) => set('allowlist', e.target.value)} spellCheck={false} />
+      </fieldset>
+      <fieldset>
+        <legend>If the CIMD path fails after it was chosen <Tag tag="lab-invented" /></legend>
+        {info.failurePolicies.map((name) => (
+          <label className="inline" key={name}><input type="radio" name={`${id}-policy`} checked={form.onCimdFailure === name} onChange={() => set('onCimdFailure', name)} /> {POLICY_LABELS[name]}</label>
+        ))}
+      </fieldset>
+      <label htmlFor={`${id}-attempts`}>Fresh connections in this run ({info.limits.minAttempts} to {info.limits.maxAttempts})</label>
+      <input id={`${id}-attempts`} type="number" min={info.limits.minAttempts} max={info.limits.maxAttempts} value={form.attempts} onChange={(e) => set('attempts', e.target.value)} />
+      <p className="hint">Text you type is echoed back only after a best-effort mask for credential-shaped values. That is a heuristic, not a guarantee. A value still percent-encoded after three decoding rounds is masked whole. Do not type real credentials.</p>
+      {children}
+    </form>
+  );
+}
+
+// Reset (the header button) remounts the body: Mock mode, the form defaults, the result and the diagram positions all go back to the start.
