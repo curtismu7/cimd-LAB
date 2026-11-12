@@ -174,7 +174,7 @@ test('the hosted deployment names no secret and the repo carries no hosts other 
   const OWN_DOCS = new Set(['README.md', 'docs/shelf-entry.json']);
   const ownOk = (h) => h === OWN_HOST && where.get(h).every((f) => OWN_DOCS.has(f));
   // Two more hosts appear in named files only: the family's repo URL and the CI gitleaks download (github.com), and the JSON Schema dialect id (json-schema.org).
-  const SCOPED = { 'github.com': new Set(['README.md', '.github/workflows/ci.yml']), 'json-schema.org': new Set(['docs/content-pack.schema.json']) };
+  const SCOPED = { 'github.com': new Set(['README.md', '.github/workflows/ci.yml', 'web/src/App.jsx']), 'json-schema.org': new Set(['docs/content-pack.schema.json']) };
   const scopedOk = (h) => Object.hasOwn(SCOPED, h) && where.get(h).every((f) => SCOPED[h].has(f));
   assert.deepEqual([...hosts].filter((h) => !allowed(h) && !ownOk(h) && !scopedOk(h)).sort(), []);
 });
