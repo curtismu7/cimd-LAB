@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import TopMenu, { applyFontSize } from './top-menu/TopMenu.jsx';
 import ModeToggle from './ModeToggle.jsx';
 import Learn from './views/Learn.jsx';
 import PfView from './views/PfView.jsx';
@@ -36,10 +37,12 @@ export default function App() {
   const [tab, setTab] = useState('learn');
   const [presenter, setPresenter] = useState(false);
   const [theme, setTheme] = useState(() => readStored('cimd-theme') ?? 'auto');
+  const [fontStep, setFontStep] = useState(() => { try { const f = localStorage.getItem('cimd.font'); return ['S','M','L'].includes(f) ? f : 'M'; } catch { return 'M'; } });
   const [resetKey, setResetKey] = useState(0);
   const [resetNote, setResetNote] = useState('');
   const [hosted, setHosted] = useState(false);
   const [info, setInfo] = useState(null);
+  const [config, setConfig] = useState(null);
   const [realAuth, setRealAuth] = useState({ checked: false, available: false, subject: null, problem: null });
   const [customer, setCustomer] = useState({ name: 'CIMD Lab', tagline: '' });
   const [vertical, setVertical] = useState(null);
@@ -55,6 +58,7 @@ export default function App() {
       const c = r.data?.customer;
       if (c && typeof c.name === 'string') setCustomer(c);
       if (typeof c?.vertical === 'string') setVertical((v) => v ?? c.vertical);
+      setConfig(r.data);
     });
     return () => { live = false; };
   }, []);
@@ -75,6 +79,7 @@ export default function App() {
     if (theme === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', theme);
     writeStored('cimd-theme', theme);
   }, [theme]);
+  useEffect(() => { applyFontSize(fontStep); try { localStorage.setItem('cimd.font', fontStep); } catch {} }, [fontStep]);
 
   // P toggles presenter mode, Esc leaves it. Keys with a modifier (browser and OS shortcuts), auto-repeat, and keys typed into a field or a
   // composition are ignored, so typing "p" in the client_id box never switches the page.
@@ -150,22 +155,19 @@ export default function App() {
           <h1>{customer.name}</h1>
         </span>
         <span className="shell-right">
-          {info && !hosted && tab !== 'h2' && <ModeToggle mode={info.source} realAvailable={info.realAvailable !== false} onChange={changeMode} />}
-          {!presenter && (
-            <>
-              <ReturnLink app="cimd" variant="header" />
-              <ShelfLink />
-              <button type="button" onClick={reset}>Reset</button>
-              <label className="shell-theme">Theme
-                <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
-                  <option value="auto">Auto</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
-            </>
-          )}
-          <button type="button" aria-pressed={presenter} aria-keyshortcuts="P Escape" title="Keys: P toggles, Esc leaves" onClick={() => setPresenter((p) => !p)}>Presenter mode</button>
+          <TopMenu
+            mode={info && !hosted && tab !== 'h2' ? { value: info.source === 'real' ? 'real' : 'mock', onChange: changeMode, realAvailable: info.realAvailable !== false } : undefined}
+            theme={{ value: theme, onChange: setTheme }}
+            fontSize={{ value: fontStep, onChange: setFontStep }}
+            present={{ active: presenter, onToggle: () => setPresenter((p) => !p), label: 'Presenter mode' }}
+            talkTrack={tab === 'talk' ? { active: true, onToggle: () => {} } : undefined}
+            help={{ href: 'https://github.com/curtismu7/cimd-LAB#readme' }}
+            version={config?.version || null}
+            onReset={!presenter ? reset : undefined}
+            extra={!presenter ? <ReturnLink app="cimd" variant="header" /> : undefined}
+          >
+            {!presenter && <ShelfLink />}
+          </TopMenu>
         </span>
         {tablist}
         {!presenter && info && info.source === 'real' && realAuth.checked && realAuth.available && !realAuth.subject && (

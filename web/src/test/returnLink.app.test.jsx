@@ -37,7 +37,7 @@ describe("return link", () => {
     await screen.findByRole("heading", { name: "What CIMD is" });
     expect(note.textContent).toContain("UC43");
     expect(document.querySelector(".banner").nextElementSibling).toBe(note);
-    expect(document.querySelector(".shell-bar .shell-right > button.return-link--header")).not.toBeNull();
+    expect(document.querySelector(".shell-bar .shell-right button.return-link--header")).not.toBeNull();
     expect(screen.getAllByRole("button", { name: /Back to Customer Agent LAB/ })).toHaveLength(2);
   });
   it("?from=ai-demo-standalone: the strip names AI Demo Standalone; Back goes to /ai-demo-standalone/", () => {

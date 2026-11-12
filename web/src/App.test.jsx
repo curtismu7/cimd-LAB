@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('presenter mode keys', () => {
   const press = (key, init = {}, target = document.body) => act(() => { target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })); });
-  const presenting = () => screen.getByRole('button', { name: 'Presenter mode' }).getAttribute('aria-pressed') === 'true';
+  const presenting = () => screen.getByTestId('presenter').getAttribute('aria-pressed') === 'true';
 
   it('P toggles presenter mode (either case), Esc leaves it, and the banner stays', async () => {
     render(<App />);
@@ -91,7 +91,7 @@ describe('tabs and cross-cutting chrome', () => {
     expect(await screen.findByRole('heading', { name: /The lab as the authorization server/ })).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Talk track' }));
     expect(await screen.findByRole('heading', { name: /talk track/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Presenter mode' }));
+    await user.click(screen.getByTestId('presenter'));
     expect(screen.getByRole('note')).toHaveTextContent(BANNER);
     expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull();
     expect(screen.getByTestId('mode')).toBeInTheDocument();
@@ -171,7 +171,7 @@ describe('hosted banner variant', () => {
     render(<App />);
     expect(await screen.findByText(new RegExp('^Hosted copy: direction 2 is simulated'))).toHaveTextContent(BANNER);
     expect(HOSTED_BANNER).toContain('direction 1 uses real PingFederate');
-    await user.click(screen.getByRole('button', { name: 'Presenter mode' }));
+    await user.click(screen.getByTestId('presenter'));
     expect(screen.getByRole('note')).toHaveTextContent(HOSTED_BANNER);
     expect(screen.getByRole('note')).toHaveTextContent(BANNER);
   });

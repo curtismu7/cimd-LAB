@@ -8,7 +8,7 @@
 /* App shell (STANDALONE-UI-PATTERNS.md section 1): Core Dark bar in both themes, Ping Red gradient rule. The bar bleeds to the window edge
    (the body pads 16px). Brand and the right-hand controls share the first row; the six view tabs get a row of their own. */
 .shell-bar { display: flex; align-items: center; gap: 0.5rem 1rem; flex-wrap: wrap; padding: 0.6rem 1.25rem; margin: 0 -16px;
-  background: var(--box-dark); color: var(--on-box); border-bottom: 3px solid transparent; border-image: var(--accent-gradient) 1; }
+  background: var(--box-dark); color: var(--on-box); border-bottom: 3px solid transparent; border-image: var(--accent-gradient) 1;  position: relative; }
 .shell-brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.02em; padding-left: 0.6rem; border-left: 4px solid var(--cust-accent-dark, var(--accent)); }
 .shell-brand h1 { margin: 0; font-size: 1.1rem; color: var(--on-box); }
 .shell-logo { width: 1.9rem; height: 1.9rem; border-radius: 4px; background: var(--accent-gradient); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; }
@@ -166,3 +166,4 @@ th { color: var(--text); }
 .edge-dark .react-flow__edge-path { stroke: var(--dg-dark); }
 .edge-grey .react-flow__edge-path { stroke: var(--dg-grey); }
 .edge-amber .react-flow__edge-path { stroke: var(--dg-amber); }
+html { font-size: var(--fs, 16px); }

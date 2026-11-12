@@ -270,6 +270,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
       },
       issuer: `${origin}/as`,
       customer: publicConfig(customer),
+      version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(),
       fixtures: Object.entries(FIXTURES).map(([name, fixture]) => ({ name, title: fixture.title, rule: fixture.rule })),
     });
   });

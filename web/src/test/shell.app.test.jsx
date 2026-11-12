@@ -43,7 +43,7 @@ describe('app shell', () => {
     expect(bar.querySelector('[role="tablist"]')).not.toBeNull();
     expect(bar.querySelector('.shell-right')).toContainElement(screen.getByRole('button', { name: 'Reset' }));
     expect(bar.querySelector('.shell-right')).toContainElement(screen.getByRole('button', { name: 'Presenter mode' }));
-    expect(bar.querySelector('.shell-right')).toContainElement(screen.getByTestId('theme'));
+    expect(bar.querySelector('.shell-right')).toContainElement(screen.getByTestId('theme-select'));
     const page = container.querySelector('.page');
     expect(page.firstElementChild).toHaveClass('banner');
     expect(page.querySelector('main')).not.toBeNull();
@@ -52,10 +52,9 @@ describe('app shell', () => {
   it('the Mock / Real toggle sits in the shell bar once the server has answered', async () => {
     info = { source: 'mock', mode: 'mock', realAvailable: true };
     const { container } = render(<App />);
-    const mock = await screen.findByTestId('mode-mock');
-    expect(container.querySelector('.shell-right')).toContainElement(mock);
-    expect(mock).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('mode-real')).toHaveAttribute('aria-pressed', 'false');
+    const modeSelect = await screen.findByTestId('mode-select');
+    expect(container.querySelector('.shell-right')).toContainElement(modeSelect);
+    expect(modeSelect).toHaveValue('mock');
   });
 
   it('the real pi.flow sign-in is part of the shell bar (shell content, not a page action), so its button is plain', async () => {
