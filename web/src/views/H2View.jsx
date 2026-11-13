@@ -143,6 +143,38 @@ function H2Body({ resetKey, presenter }) {
   );
 }
 
+
+function MockTable({ table, info, onLoad }) {
+  if (!table) return <p>Loading the Mock table.</p>;
+  return (
+    <div data-testid="mock-table">
+      <ul className="sim-cards">
+        {table.scenarios.map((scenario) => {
+          const s = scenario.result.summary;
+          return (
+            <li key={scenario.id} className="sim-cards__item" data-testid={`mock-row-${scenario.id}`}>
+              <h4 className="sim-cards__title">{scenario.title}</h4>
+              <p className="sim-cards__say">{scenario.say}</p>
+              <dl className="sim-cards__facts">
+                <dt>Outcome</dt><dd>{s.outcome === 'registered' ? `registered via ${s.via}` : `refused: ${s.reason}`}</dd>
+                <dt>Document fetches</dt><dd>{s.fetches}</dd>
+                <dt>Cache hits</dt><dd>{s.cacheHits}</dd>
+                <dt>Registrations stored</dt><dd>{s.dcrRecords}</dd>
+              </dl>
+              <details>
+                <summary>Steps of the first attempt</summary>
+                <Steps steps={scenario.result.attempts[0].steps} />
+              </details>
+              <button type="button" onClick={() => onLoad(scenario.input)}>Run this in Live</button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="hint">{table.note} Metadata tags: {Object.entries(info.metadataTags).map(([k, v]) => `${k} (${v})`).join(', ')}.</p>
+    </div>
+  );
+}
+
 function Steps({ steps }) {
   return (
     <ol className="sim-steps">
