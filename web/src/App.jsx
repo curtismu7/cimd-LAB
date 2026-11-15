@@ -9,6 +9,7 @@ import TalkTrack from './views/TalkTrack.jsx';
 import Stories from './views/Stories.jsx';
 import H2View from './views/H2View.jsx';
 import ShelfLink from "./components/ShelfLink.jsx";
+import VerifyMark from "./components/VerifyMark.jsx";
 // Opened from Customer Agent LAB (UC43 routes here): strip + header Back only; no tab or vertical is preselected.
 import ReturnLink from "./return-link/ReturnLink.jsx";
 
@@ -168,6 +169,7 @@ export default function App() {
             extra={!presenter ? <ReturnLink app="cimd" variant="header" /> : undefined}
           >
             {!presenter && <ShelfLink />}
+            {!presenter && <VerifyMark id="cimd-lab" />}
           </TopMenu>
           </span>
         </span>
