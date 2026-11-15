@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api.js';
 import DiagramView from '../DiagramView.jsx';
+import Json from '../components/JsonPane.jsx';
+import { CIMD_HOT } from './Learn.jsx';
 
 // The H2 2026 tab: an MCP gateway that prefers CIMD client registration, from slide 36 of Ping's "ID4AI Workforce - H2 2026" deck.
 // A local simulation. Mock = the table generated from the engine; Live = the same engine on the visitor's own inputs. Neither contacts
@@ -195,7 +197,7 @@ function Steps({ steps }) {
           {step.document ? (
             <details>
               <summary>Simulated document</summary>
-              <pre>{JSON.stringify(step.document, null, 2)}</pre>
+              <Json value={step.document} label="Simulated document" hot={CIMD_HOT} />
             </details>
           ) : null}
         </li>

@@ -30,7 +30,7 @@ h4, h5 { color: var(--text); }
 a { color: var(--status-info); }
 code, pre { font-size: 0.9em; }
 code { overflow-wrap: anywhere; }
-pre { background: var(--surface); border: 1px solid var(--border); padding: 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 6px; color: var(--text-body); }
+pre { background: var(--surface); border: 1px solid var(--border); padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 6px; color: var(--text-body); }
 textarea { width: 100%; font-family: var(--font-mono); display: block; margin: 8px 0; }
 input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--accent); }
 input[type="number"] { width: 8em; }
