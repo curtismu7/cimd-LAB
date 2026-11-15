@@ -226,7 +226,7 @@ export function ResultView({ result, metadataTags }) {
       <h5>Discovery metadata the gateway published in this scenario</h5>
       <ul className="sim-meta">
         {Object.entries(result.metadata).map(([key, value]) => (
-          <li key={key}><code>{key}</code>: <code>{JSON.stringify(value)}</code> <Tag tag={metadataTags[key] ?? 'lab-invented'} /></li>
+          <li key={key}><code>{key}</code> <Json value={value} label={key} /> <Tag tag={metadataTags[key] ?? 'lab-invented'} /></li>
         ))}
       </ul>
       {result.attempts.map((attempt) => (

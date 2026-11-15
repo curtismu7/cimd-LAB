@@ -3,6 +3,7 @@ import { render, screen, within, waitFor, fireEvent, act } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import App, { RELEASE_BANNER, TABS, MODE_H2, MODE_PF } from './App.jsx';
 import H2View, { MODE_TEXT } from './views/H2View.jsx';
+import { setJsonView } from './components/JsonPane.jsx';
 import { MOCK_TABLE } from '../../server/src/gateway-sim-table.js';
 import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from '../../server/src/gateway-sim-claims.js';
 import { DEFAULTS, LIMITS, DOCUMENTS, FAILURE_POLICIES, METADATA_TAGS, FIELDS } from '../../server/src/gateway-sim.js';
@@ -14,6 +15,7 @@ const RESULT = MOCK_TABLE.scenarios[0].result;
 let evaluateReply;
 let calls;
 beforeEach(() => {
+  setJsonView('form'); // the Form | JSON choice is shared module state: every test starts on Form
   calls = [];
   evaluateReply = () => json(RESULT);
   vi.stubGlobal('fetch', vi.fn(async (url, init) => {
@@ -186,6 +188,19 @@ describe('H2 2026 tab: Live', () => {
     expect(within(result).getByText('client_id_metadata_document_supported').closest('li')).toHaveTextContent('lab reading');
     expect(within(result).getByText('code_challenge_methods_supported').closest('li')).toHaveTextContent('lab reading');
     expect(within(result).getByText('code_challenge_methods_supported').closest('li')).not.toHaveTextContent('deck claim');
+    // Each discovery value is its own JsonPane, with its one tag beside it.
+    const metaRows = [...result.querySelectorAll('.sim-meta > li')];
+    expect(metaRows).toHaveLength(Object.keys(RESULT.metadata).length);
+    for (const row of metaRows) {
+      expect(row.querySelectorAll(':scope > .jsonbox')).toHaveLength(1);
+      expect(row.querySelectorAll(':scope > .tag-badge')).toHaveLength(1);
+    }
+    const pane = (key) => within(result).getByText(key).closest('li').querySelector('.jsonbox');
+    expect(pane('issuer')).toHaveTextContent(RESULT.metadata.issuer);
+    expect(pane('client_id_metadata_document_supported')).toHaveTextContent('true');
+    expect(within(pane('code_challenge_methods_supported')).getByText('S256')).toHaveClass('jform__chip');
+    await user.click(within(pane('code_challenge_methods_supported')).getByRole('button', { name: 'JSON' }));
+    expect(pane('code_challenge_methods_supported').querySelector('pre')).toHaveTextContent('[ "S256" ]');
     expect(result).toHaveTextContent(`Trace id for this run: ${RESULT.traceId}`);
   });
 
