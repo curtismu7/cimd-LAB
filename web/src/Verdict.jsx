@@ -1,3 +1,5 @@
+import Json from './components/JsonPane.jsx';
+
 // Every verdict value the API can return, with what it means. All text is rendered as React text, never as HTML.
 export const VERDICTS = {
   accepted: {
@@ -45,7 +47,7 @@ export default function Verdict({ result }) {
       <h5>Authorize request URL (inert text, never opened by this page)</h5>
       <pre data-testid="verdict-request">{String(result.request ?? '')}</pre>
       <h5>PingFederate raw response excerpt</h5>
-      <pre data-testid="verdict-excerpt">{String(result.excerpt ?? '')}</pre>
+      <Json value={String(result.excerpt ?? '')} label="PingFederate raw response excerpt" testId="verdict-excerpt" />
     </div>
   );
 }

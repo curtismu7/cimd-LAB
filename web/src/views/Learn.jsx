@@ -1,8 +1,12 @@
 import { useId, useState } from 'react';
 import DiagramView from '../DiagramView.jsx';
+import Json from '../components/JsonPane.jsx';
 import {
   SOURCES, PROBLEM, COMPARISON, NOT_FIXED, WHEN_TO_USE, CALC_DEFAULTS, CALC_LIMITS, clampInput, registrationMath,
 } from '../learn/content.js';
+
+// The fields a reader checks first in a client metadata document (client_id is hot by default).
+export const CIMD_HOT = ['redirect_uris', 'token_endpoint_auth_method', 'client_secret', 'jwks_uri'];
 
 const FIELDS = [
   ['client_id', 'Required. The https URL of this very document. Must equal the URL it was fetched from.'],
@@ -141,13 +145,13 @@ export default function Learn({ resetKey }) {
       </dl>
 
       <h3>Anatomy of a document</h3>
-      <pre className="code">{`{
+      <Json label="Client ID Metadata Document" hot={CIMD_HOT} value={`{
   "client_id": "https://app.example/oauth/client.json",
   "client_name": "Sample app",
   "client_uri": "https://app.example",
   "redirect_uris": ["https://app.example/callback"],
   "token_endpoint_auth_method": "none"
-}`}</pre>
+}`} />
       <dl className="fields">
         {FIELDS.map(([name, text]) => <div key={name}><dt><code>{name}</code></dt><dd>{text}</dd></div>)}
       </dl>

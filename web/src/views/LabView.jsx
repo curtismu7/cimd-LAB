@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import DiagramView from '../DiagramView.jsx';
+import Json from '../components/JsonPane.jsx';
 
 export function Trace({ trace }) {
   const list = Array.isArray(trace) ? trace : [trace];
@@ -10,7 +11,8 @@ export function Trace({ trace }) {
       <h5>Request</h5>
       <pre>{`${t.request?.method ?? ''} ${t.request?.url ?? ''}`}</pre>
       <h5>Response</h5>
-      <pre>{`HTTP ${t.response?.status}\n${JSON.stringify(t.response?.body, null, 2) ?? ''}`}</pre>
+      <p>HTTP <code>{String(t.response?.status)}</code></p>
+      <Json value={t.response?.body} label="Response body" hot={['check', 'redirect', 'pending', 'redirect_uri']} />
     </div>
   ));
 }
