@@ -136,7 +136,13 @@ th { color: var(--text); }
 .sim-result__headline[data-state="ok"] { color: var(--status-ok); }
 .sim-result__headline[data-state="bad"] { color: var(--danger-text); }
 .sim-result__note { color: var(--muted); }
-.sim-meta { padding-left: 20px; }
+.sim-meta { list-style: none; padding-left: 0; }
+.sim-meta > li { display: grid; grid-template-columns: minmax(0, 20rem) minmax(0, 1fr) auto; grid-template-areas: "key pane tag"; gap: 4px 12px; align-items: start; margin: 8px 0; }
+.sim-meta > li > code { grid-area: key; overflow-wrap: anywhere; }
+.sim-meta > li > .jsonbox { grid-area: pane; }
+.sim-meta > li > .tag-badge { grid-area: tag; justify-self: start; }
+.sim-meta > li > .jsonbox > .json { margin: 0; }
+@media (max-width: 600px) { .sim-meta > li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "key tag" "pane pane"; } }
 .sim-form label { display: block; font-weight: 700; margin-top: 8px; }
 .sim-form label.inline { display: inline-flex; font-weight: 600; }
 .sim-form legend { font-weight: 700; padding: 0 4px; }
