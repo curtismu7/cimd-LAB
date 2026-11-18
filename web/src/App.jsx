@@ -6,6 +6,8 @@ import Learn from './views/Learn.jsx';
 import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
 import TalkTrack from './views/TalkTrack.jsx';
+import { useStory } from './views/useStory.js';
+import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
 import Stories from './views/Stories.jsx';
 import H2View from './views/H2View.jsx';
 import ShelfLink from "./components/ShelfLink.jsx";
@@ -47,6 +49,15 @@ export default function App() {
   const [realAuth, setRealAuth] = useState({ checked: false, available: false, subject: null, problem: null });
   const [customer, setCustomer] = useState({ name: 'CIMD Lab', tagline: '' });
   const [vertical, setVertical] = useState(null);
+  const [talkOpen, setTalkOpen] = useState(false);
+  const { story: talkStory } = useStory(vertical);
+  const talkSteps = (() => {
+    if (!talkStory) return [];
+    const steps = []; let n = 0;
+    for (const t of talkStory.intro) { n += 1; steps.push({ id: `i${n}`, title: 'Intro', say: t }); }
+    for (const t of talkStory.talkTrack ?? []) { n += 1; steps.push({ id: `t${n}`, title: t.title ?? 'Step', say: t.say ?? t }); }
+    return steps;
+  })();
   const tabRefs = useRef({});
 
   useEffect(() => {
@@ -162,7 +173,7 @@ export default function App() {
             theme={{ value: theme, onChange: setTheme }}
             fontSize={{ value: fontStep, onChange: setFontStep }}
             present={{ active: presenter, onToggle: () => setPresenter((p) => !p), label: 'Presenter mode' }}
-            talkTrack={tab === 'talk' ? { active: true, onToggle: () => {} } : undefined}
+            talkTrack={{ active: talkOpen, onToggle: () => setTalkOpen((v) => !v) }}
             help={{ href: 'https://github.com/curtismu7/cimd-LAB#readme' }}
             version={config?.version || null}
             onReset={!presenter ? reset : undefined}
@@ -200,6 +211,8 @@ export default function App() {
           <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} />
         </main>
       </div>
+      <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={talkSteps} />
     </div>
   );
 }
+
