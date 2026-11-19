@@ -84,13 +84,13 @@ function RegistrationMath() {
 export default function Learn({ resetKey }) {
   return (
     <div className="view" key={resetKey}>
-      <h2>What CIMD is</h2>
+      <h2 data-n="1">What CIMD is</h2>
       <p>
         An OAuth Client ID Metadata Document (CIMD) lets a client use an https URL as its client_id.
         The authorization server fetches the JSON document behind that URL and reads the client's name, redirect addresses and
         settings from it. The client is never registered with the server beforehand.
       </p>
-      <h3>The registration problem, in full</h3>
+      <h3 data-n="2">The registration problem, in full</h3>
       <p>
         Every OAuth client has to tell a server who it is before the flow starts. Three ways to do that exist today:
         a person registers the client by hand, the client registers itself (DCR), or the client points at a document it owns (CIMD).
@@ -107,7 +107,7 @@ export default function Learn({ resetKey }) {
       </ol>
       <RegistrationMath />
 
-      <h3>DCR versus CIMD, row by row</h3>
+      <h3 data-n="3">DCR versus CIMD, row by row</h3>
       <p>
         In one line: with DCR the server hands out the id and keeps a record; with CIMD the client already has an id, which is the
         address of a document it owns, and the server reads that document when it needs it.
@@ -128,7 +128,7 @@ export default function Learn({ resetKey }) {
         {(simulate) => <button type="button" className="primary" onClick={simulate}>Simulate</button>}
       </DiagramView>
 
-      <h3>What CIMD does not fix</h3>
+      <h3 data-n="4">What CIMD does not fix</h3>
       <ul className="problem">
         {NOT_FIXED.map((item) => (
           <li key={item.title}>
@@ -139,12 +139,12 @@ export default function Learn({ resetKey }) {
         ))}
       </ul>
 
-      <h3>Which one to use</h3>
+      <h3 data-n="5">Which one to use</h3>
       <dl className="fields">
         {WHEN_TO_USE.map(([when, use]) => <div key={when}><dt>{when}</dt><dd>{use}</dd></div>)}
       </dl>
 
-      <h3>Anatomy of a document</h3>
+      <h3 data-n="6">Anatomy of a document</h3>
       <Json label="Client ID Metadata Document" hot={CIMD_HOT} value={`{
   "client_id": "https://app.example/oauth/client.json",
   "client_name": "Sample app",
@@ -156,19 +156,19 @@ export default function Learn({ resetKey }) {
         {FIELDS.map(([name, text]) => <div key={name}><dt><code>{name}</code></dt><dd>{text}</dd></div>)}
       </dl>
 
-      <h3>The validation rules this lab applies, and why</h3>
+      <h3 data-n="7">The validation rules this lab applies, and why</h3>
       <ul className="rules">
         {RULES.map(([rule, why]) => <li key={rule}><strong>{rule}.</strong> {why}</li>)}
       </ul>
 
-      <h3>What PingFederate does when no policy matches</h3>
+      <h3 data-n="8">What PingFederate does when no policy matches</h3>
       <p>
         PingFederate only fetches a client's document when an enabled CIMD policy matches the client_id URL, and a policy takes one metadata URL.
         When no policy matches, PingFederate answers HTTP 400 on the authorize request and never fetches the document.
         The lab shows this as the <code>rejected</code> verdict.
       </p>
 
-      <h3>Sources, and how to read the tags</h3>
+      <h3 data-n="9">Sources, and how to read the tags</h3>
       <p className="hint">Read on 2026-10-29. A tag on a claim names where it comes from; "inference" means the lab reasoned it out and no source says it.</p>
       <dl className="fields">
         {SOURCES.map(([name, text]) => <div key={name}><dt>{name}</dt><dd>{text}</dd></div>)}

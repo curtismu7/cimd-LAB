@@ -44,6 +44,8 @@ fieldset { border: 1px solid var(--border); border-radius: 6px; margin: 8px 0; }
 .card button { margin: 8px 8px 0 0; }
 .card > h3:first-child { margin-top: 0; }
 .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 16px; }
+.step-num { display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.4rem; border-radius: 999px; background: var(--accent-gradient); color: var(--on-accent); font: 700 0.75rem var(--font-mono); margin-right: 0.5em; vertical-align: 2px; }
+h2[data-n]::before, h3[data-n]::before { content: attr(data-n); display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.4rem; border-radius: 999px; background: var(--accent-gradient); color: var(--on-accent); font: 700 0.75rem var(--font-mono); margin-right: 0.5em; vertical-align: 2px; }
 .hint { color: var(--muted); font-size: 0.9em; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
 dt { font-weight: 700; color: var(--text); }
@@ -108,7 +110,8 @@ th { color: var(--text); }
 .cmp-cols p { margin: 4px 0 0; }
 .cmp-tag { display: inline-block; font-weight: 700; font-size: 0.8em; letter-spacing: 0.04em; padding: 1px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--text); }
 .cmp-tag-cimd { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.calc-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 8px 0 12px; }
+.calc-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 8px 0 12px; }
+@media (max-width: 900px) { .calc-inputs { grid-template-columns: 1fr; } }
 .calc-field { display: grid; gap: 4px; font-weight: 700; }
 .calc-field input { width: 100%; }
 .calc-out h4 { margin: 0 0 4px; }
@@ -123,7 +126,8 @@ th { color: var(--text); }
 .tag-legend { list-style: none; padding: 0; display: grid; gap: 6px; }
 .sim-table { min-width: 520px; }
 .sim-table td { overflow-wrap: anywhere; }
-.sim-cards { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; }
+.sim-cards { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 900px) { .sim-cards { grid-template-columns: 1fr; } }
 .sim-cards__item { border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 0; background: var(--surface-2); color: var(--text-body); }
 .sim-cards__title { margin: 0 0 4px; }
 .sim-cards__say { margin: 0 0 8px; }
