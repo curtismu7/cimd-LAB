@@ -179,3 +179,15 @@ th { color: var(--text); }
 .edge-grey .react-flow__edge-path { stroke: var(--dg-grey); }
 .edge-amber .react-flow__edge-path { stroke: var(--dg-amber); }
 html { font-size: var(--fs, 16px); }
+
+/* Hidden back handles: an arrow that points back to the left leaves and re-enters a little lower. */
+.react-flow__handle.handle-back { top: 70%; opacity: 0; pointer-events: none; }
+
+/* An expanded box (diagram kit §8c): give it a width the details can be read at. */
+.react-flow__node.dk-open {
+  width: 320px;
+}
+.react-flow__node.dk-open .dg-node {
+  max-height: 420px;
+  overflow-y: auto;
+}
