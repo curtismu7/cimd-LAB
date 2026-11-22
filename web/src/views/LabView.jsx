@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../api.js';
 import DiagramView from '../DiagramView.jsx';
 import Json from '../components/JsonPane.jsx';
+import RunRecord from '../RunRecord.jsx';
 
 export function Trace({ trace }) {
   const list = Array.isArray(trace) ? trace : [trace];
@@ -17,10 +18,11 @@ export function Trace({ trace }) {
   ));
 }
 
-export default function LabView({ resetKey }) {
+export default function LabView({ resetKey, source }) {
   const [run, setRun] = useState(null);
   const [busy, setBusy] = useState(false);
-  const start = async () => { setBusy(true); setRun(await api.tester()); setBusy(false); };
+  const [runKey, setRunKey] = useState(0);
+  const start = async () => { setBusy(true); setRun(await api.tester()); setBusy(false); setRunKey((k) => k + 1); };
   const data = run?.data;
   return (
     <div className="view" key={resetKey}>
@@ -53,6 +55,7 @@ export default function LabView({ resetKey }) {
           </div>
         )}
       </section>
+      <RunRecord kind="tester" source={source} runKey={runKey} />
     </div>
   );
 }

@@ -64,6 +64,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .summary { font-size: 1.3em; font-weight: 700; color: var(--text); }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; min-width: 640px; }
+.ro-table { min-width: 0; } /* the shared run-observability panel brings its own narrow-screen layout; the global table minimum would force it wide */
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { color: var(--text); }
 .trace { border-left: 3px solid var(--border); padding-left: 12px; margin: 8px 0; }

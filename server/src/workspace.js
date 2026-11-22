@@ -53,7 +53,7 @@ export function createWorkspaces({ hosted, local = 'default', max = MAX_WORKSPAC
   function middleware(req, res, next) {
     const grant = req.headers['x-cimd-internal'];
     if (typeof grant === 'string' && isLoopbackAddress(req.socket.remoteAddress) && internal.has(grant)) {
-      req.workspaceId = internal.get(grant);
+      ({ workspaceId: req.workspaceId, runId: req.runId } = internal.get(grant));
       return next();
     }
     if (!hosted) { req.workspaceId = localId; return next(); }
@@ -67,11 +67,11 @@ export function createWorkspaces({ hosted, local = 'default', max = MAX_WORKSPAC
     return next();
   }
 
-  // Tester: a run gets a token that maps to the caller's workspace, valid until the run ends.
-  function grantInternal(workspaceId) {
+  // Tester: a run gets a token that maps to the caller's workspace (and to the run's id), valid until the run ends.
+  function grantInternal(workspaceId, runId) {
     if (internal.size >= 100) throw new Error('too many runs');
     const grant = crypto.randomBytes(24).toString('base64url');
-    internal.set(grant, workspaceId);
+    internal.set(grant, { workspaceId, runId });
     return { grant, revoke: () => internal.delete(grant) };
   }
 

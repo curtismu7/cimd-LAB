@@ -28,6 +28,7 @@ export const api = {
   gatewaySimMock: () => call('GET', '/api/gateway-sim/mock'),
   gatewaySimEvaluate: (input) => call('POST', '/api/gateway-sim/evaluate', input),
   tester: () => call('POST', '/api/tester/run'),
+  runObservability: (kind) => call('GET', `/api/run-observability/${encodeURIComponent(kind)}`),
   stories: () => call('GET', '/api/stories'),
   story: (vertical) => call('GET', `/api/stories/${encodeURIComponent(vertical)}`),
   reset: () => call('POST', '/api/reset'),

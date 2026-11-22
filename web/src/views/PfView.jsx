@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Verdict from '../Verdict.jsx';
 import DiagramView from '../DiagramView.jsx';
+import RunRecord from '../RunRecord.jsx';
 
 const SAMPLE = JSON.stringify({
   client_id: 'https://app.example/oauth/client.json',
@@ -41,7 +42,7 @@ function Validator() {
   );
 }
 
-export default function PfView({ resetKey }) {
+export default function PfView({ resetKey, source }) {
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState(null);
   const [confirm, setConfirm] = useState(false);
@@ -49,11 +50,12 @@ export default function PfView({ resetKey }) {
   const [probe, setProbe] = useState(null);
   const [conformance, setConformance] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [runKey, setRunKey] = useState(0);
 
   useEffect(() => { let live = true; api.config().then((r) => live && setConfig(r)); return () => { live = false; }; }, []);
 
   const checkStatus = async () => { setBusy(true); setStatus(await api.pfStatus()); setBusy(false); };
-  const runProbe = async () => { setBusy(true); setProbe(await api.pfProbe(preset)); setBusy(false); };
+  const runProbe = async () => { setBusy(true); setProbe(await api.pfProbe(preset)); setBusy(false); setRunKey((k) => k + 1); };
   const runConformance = async () => { setBusy(true); setConformance(await api.pfConformance()); setBusy(false); };
   const s = status?.data;
   // Once the config has loaded, no PF_BASE_URL means nothing may be sent.
@@ -122,6 +124,8 @@ export default function PfView({ resetKey }) {
           </ul>
         </details>
       </section>
+
+      <RunRecord kind="probe" source={source} runKey={runKey} />
 
       <section className="card" data-testid="pf-conformance">
         <h3>Conformance run</h3>

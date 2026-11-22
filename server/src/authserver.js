@@ -38,6 +38,7 @@ export function createAuthServer({
   allowedHosts = null,
   now = Date.now,
   touch = () => {},
+  onDecision = () => {}, // (req, event): one call per decision, for the run record and the stdout line (see runLog.js)
 } = {}) {
   const router = express.Router();
   // Per-workspace state: a request or code made in one workspace does not exist in any other.
@@ -121,6 +122,7 @@ export function createAuthServer({
   router.get('/authorize', async (req, res) => {
     try {
       const result = await evaluate(req.query);
+      onDecision(req, { step: 'authorize', outcome: 'allowed', client: show(result.clientId), detail: { checks: result.checks.length } });
       const { pending } = storeFor(req.workspaceId);
       prune(pending, now);
       const id = token();
@@ -146,6 +148,7 @@ export function createAuthServer({
       });
     } catch (error) {
       if (!(error instanceof Refusal)) return res.status(500).json({ error: 'server_error' });
+      onDecision(req, { step: 'authorize', outcome: 'refused', check: error.check, text: error.message, client: show(typeof req.query.client_id === 'string' ? req.query.client_id : ''), detail: { error: error.error } });
       // Never redirect to a redirect_uri that was not proven by the document.
       return res.status(400).set('Cache-Control', 'no-store').json({ error: error.error, check: error.check, error_description: error.message, ...error.extra });
     }
@@ -155,8 +158,12 @@ export function createAuthServer({
     const { pending, codes } = storeFor(req.workspaceId);
     prune(pending, now);
     const entry = pending.get(req.body?.pending);
-    if (!entry) return res.status(400).json({ error: 'invalid_request', error_description: 'Unknown or expired request' });
+    if (!entry) {
+      onDecision(req, { step: 'approve', outcome: 'refused', check: 'pending', text: 'Unknown or expired request', client: '' });
+      return res.status(400).json({ error: 'invalid_request', error_description: 'Unknown or expired request' });
+    }
     pending.delete(req.body.pending);
+    onDecision(req, { step: 'approve', outcome: req.body.decision === 'allow' ? 'allowed' : 'refused', check: 'consent', client: show(entry.clientId) });
     const target = new URL(entry.redirectUri);
     if (req.body.decision !== 'allow') target.searchParams.set('error', 'access_denied');
     else {
@@ -175,9 +182,11 @@ export function createAuthServer({
     const body = req.body ?? {};
     const entry = codes.get(body.code);
     codes.delete(body.code);
-    if (body.grant_type !== 'authorization_code' || !entry || entry.exp <= now()) return res.status(400).json({ error: 'invalid_grant' });
-    if (entry.clientId !== body.client_id || entry.redirectUri !== body.redirect_uri) return res.status(400).json({ error: 'invalid_grant' });
-    if (typeof body.code_verifier !== 'string' || s256(body.code_verifier) !== entry.challenge) return res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verifier does not match' });
+    const decided = (outcome, check) => onDecision(req, { step: 'exchange', outcome, check, client: show(typeof body.client_id === 'string' ? body.client_id : '') });
+    if (body.grant_type !== 'authorization_code' || !entry || entry.exp <= now()) { decided('refused', 'code'); return res.status(400).json({ error: 'invalid_grant' }); }
+    if (entry.clientId !== body.client_id || entry.redirectUri !== body.redirect_uri) { decided('refused', 'client'); return res.status(400).json({ error: 'invalid_grant' }); }
+    if (typeof body.code_verifier !== 'string' || s256(body.code_verifier) !== entry.challenge) { decided('refused', 'pkce'); return res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verifier does not match' }); }
+    decided('allowed');
     return res.json({
       access_token: `cimd-lab.${token(18)}`,
       token_type: 'Bearer',

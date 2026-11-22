@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import DiagramView from '../DiagramView.jsx';
 import Json from '../components/JsonPane.jsx';
 import { CIMD_HOT } from './Learn.jsx';
+import RunRecord from '../RunRecord.jsx';
 
 // The H2 2026 tab: an MCP gateway that prefers CIMD client registration, from slide 36 of Ping's "ID4AI Workforce - H2 2026" deck.
 // A local simulation. Mock = the table generated from the engine; Live = the same engine on the visitor's own inputs. Neither contacts
@@ -34,11 +35,11 @@ const toForm = (input) => ({ ...input, allowlist: input.allowlist.join('\n') });
 const fromForm = (form) => ({ ...form, allowlist: form.allowlist.split('\n').filter((line) => line.trim() !== ''), attempts: Number(form.attempts) });
 
 // children = the submit button: the view places its own primary action (the Mock view's primary is the diagram's Simulate instead).
-export default function H2View({ resetKey = 0, presenter = false }) {
-  return <H2Body key={resetKey} resetKey={resetKey} presenter={presenter} />;
+export default function H2View({ resetKey = 0, presenter = false, source }) {
+  return <H2Body key={resetKey} resetKey={resetKey} presenter={presenter} source={source} />;
 }
 
-function H2Body({ resetKey, presenter }) {
+function H2Body({ resetKey, presenter, source }) {
   const [info, setInfo] = useState(null);
   const [failed, setFailed] = useState(false);
   const [table, setTable] = useState(null);
@@ -46,6 +47,7 @@ function H2Body({ resetKey, presenter }) {
   const [form, setForm] = useState(null);
   const [run, setRun] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [runKey, setRunKey] = useState(0);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -67,6 +69,7 @@ function H2Body({ resetKey, presenter }) {
     const mine = ++seq.current;
     setBusy(true);
     const r = await api.gatewaySimEvaluate(fromForm(form));
+    setRunKey((k) => k + 1);
     if (mine !== seq.current) return; // a newer run owns the screen
     setRun(r);
     setBusy(false);
@@ -137,6 +140,7 @@ function H2Body({ resetKey, presenter }) {
                 {run && !run.ok ? <p className="tone-bad" role="alert" data-testid="sim-error">Refused: <code>{String(run.data?.error ?? run.status)}</code>{run.data?.field ? <> in <code>{String(run.data.field)}</code></> : null}</p> : null}
                 {run?.ok ? <ResultView result={run.data} metadataTags={info.metadataTags} /> : null}
               </section>
+              <RunRecord kind="h2" source={source} runKey={runKey} />
             </div>
           )}
         </>
