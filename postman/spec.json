@@ -1,0 +1,77 @@
+{
+  "name": "CIMD LAB",
+  "slug": "cimd-lab",
+  "description": "API collection for CIMD LAB: drive the lab's teaching authorization server (Direction 2), probe real PingFederate (Direction 1), and exercise the H2 2026 gateway simulation (mock only). Pair with <slug>.live.environment.json filled by shared/postman/fill-env.mjs.",
+  "baseUrl": "http://localhost:5250",
+  "env": {
+    "PF_BASE_URL": "PingFederate base URL (Direction 1 only; the shared env calls it PF_URL — map it here)",
+    "CIMD_CLIENT_ID_URL": "Public https URL of the lab's own CIMD document allowlisted in PingFederate (conformance/probe 'own' preset)",
+    "CIMD_REDIRECT_URI": "Public https callback URL paired with CIMD_CLIENT_ID_URL (hosted value: the hosted lab's /callback)"
+  },
+  "envAliases": {
+    "PF_BASE_URL": "PF_URL",
+    "CIMD_CLIENT_ID_URL": "HOSTED_CIMD_URL",
+    "CIMD_REDIRECT_URI": "HOSTED_CIMD_URL"
+  },
+  "folders": [
+    {
+      "name": "Sanity",
+      "description": "Lab liveness and configuration as the server sees it.",
+      "requests": [
+        { "name": "Health", "method": "GET", "path": "/api/health",
+          "tests": ["pm.response.to.have.status(200);", "const b = pm.response.json(); pm.expect(b.state).to.eql('ready');"] },
+        { "name": "Info", "method": "GET", "path": "/api/info",
+          "tests": ["pm.response.to.have.status(200);"] }
+      ]
+    },
+    {
+      "name": "Direction 2 — Lab teaching AS",
+      "description": "The lab's own CIMD-capable authorization server. Fetch its client documents and validate a pasted document. Fully local; the AS is a teaching server, not a product.",
+      "requests": [
+        { "name": "Fetch the good fixture document", "method": "GET", "path": "/fixtures/good.json",
+          "tests": ["pm.response.to.have.status(200);", "const b = pm.response.json(); pm.expect(b.client_id).to.be.a('string');"] },
+        { "name": "Fetch the client_id-mismatch fixture (negative)", "method": "GET", "path": "/fixtures/client-id-mismatch.json",
+          "tests": ["pm.response.to.have.status(200);", "const b = pm.response.json(); pm.expect(b.client_id).to.be.a('string');"] },
+        { "name": "Fetch an unknown fixture (negative)", "method": "GET", "path": "/fixtures/nope.json",
+          "tests": ["pm.expect(pm.response.code).to.eql(404);"] },
+        { "name": "Validate a pasted document", "method": "POST", "path": "/api/validate",
+          "body": { "document": { "client_id": "https://client.example/client.json", "redirect_uris": ["https://client.example/callback"], "token_endpoint_auth_method": "none" } },
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json()).to.have.property('valid');"] },
+        { "name": "Validate an invalid document (negative)", "method": "POST", "path": "/api/validate",
+          "body": { "document": { "redirect_uris": ["not-a-url"] } },
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().valid).to.eql(false);"] }
+      ]
+    },
+    {
+      "name": "Direction 1 — Real PingFederate",
+      "description": "The lab as a client of the real PingFederate named by PF_BASE_URL. Requires the lab server to be running with PF_BASE_URL set (Direction 1 off otherwise: requests answer 409 pf_not_configured).",
+      "requests": [
+        { "name": "PF discovery status", "method": "GET", "path": "/api/pf/status",
+          "tests": ["pm.response.to.have.status(200);"] },
+        { "name": "Probe PF with client.dev preset", "method": "POST", "path": "/api/pf/probe",
+          "body": { "confirm": true, "preset": "client.dev" },
+          "tests": ["pm.response.to.have.status(200);"] },
+        { "name": "Probe PF without confirm (negative)", "method": "POST", "path": "/api/pf/probe",
+          "body": { "preset": "client.dev" },
+          "tests": ["pm.expect(pm.response.code).to.be.oneOf([400, 409]);"] }
+      ]
+    },
+    {
+      "name": "H2 2026 gateway-sim",
+      "mockOnly": true,
+      "description": "Local simulation of the Ping H2 2026 claim that an MCP gateway prefers CIMD client registration. Every product claim is a Ping release claim, UNVERIFIED on our tenant; no request leaves the lab.",
+      "requests": [
+        { "name": "Simulation info", "method": "GET", "path": "/api/gateway-sim/info",
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json()).to.have.property('banner');"] },
+        { "name": "Mock table", "method": "GET", "path": "/api/gateway-sim/mock",
+          "tests": ["pm.response.to.have.status(200);"] },
+        { "name": "Evaluate a CIMD-preferring registration", "method": "POST", "path": "/api/gateway-sim/evaluate",
+          "body": { "gatewayAdvertisesCimd": true, "gatewayOffersDcr": true, "clientSupportsCimd": true, "clientSupportsDcr": true, "clientIdUrl": "https://client.example/oauth/client.json", "document": "good", "onCimdFailure": "refuse", "allowlist": ["https://client.example/oauth/client.json"], "attempts": 3 },
+          "tests": ["pm.response.to.have.status(200);"] },
+        { "name": "Evaluate with a missing field (negative)", "method": "POST", "path": "/api/gateway-sim/evaluate",
+          "body": { "gatewayAdvertisesCimd": true },
+          "tests": ["pm.expect(pm.response.code).to.eql(400);", "pm.expect(pm.response.json()).to.have.property('error');"] }
+      ]
+    }
+  ]
+}
