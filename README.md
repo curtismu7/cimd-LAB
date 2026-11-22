@@ -90,6 +90,27 @@ The PingFederate and Lab-as-server tabs are not mocked: direction 1 is real Ping
 
 Typed text (the client_id URL and the allowlist) is echoed back only after a best-effort mask for credential-shaped values, and every answer passes through a second masking pass. **Masking is a heuristic**, not a guarantee: it catches common token shapes, `password <value>`, `"password":"x"`, `user:pw@host` (with or without a scheme), percent-encoded text up to three layers deep, every kind of space (including U+2028, U+2029, U+1680 and the Unicode space separators) between a keyword and its value, a tab or line break inside a keyword (`pass<TAB>word is x`), and zero-width or control characters used to hide them. **A value that is still percent-encoded after three decoding rounds is masked whole** (`[masked:undecodable]`): nothing legitimate is encoded four times, and a short secret under four or more layers would otherwise get through. a short random value with no keyword in front of it is not found. A password word followed by any word is masked too, so "password policy" is masked (a known false positive). Do not type real credentials. The same display rule covers the lab-as-server route `GET /as/authorize`: the `client_id`, hosts and document values it echoes in `checks[].detail`, the consent block and the refusal messages are shown with their credential-shaped parts masked (specific shapes only, so a normal URL is shown as typed); the checks themselves still run on the raw value.
 
+## Postman collection and MCP server
+
+The lab ships a Postman collection (`postman/cimd-lab.postman_collection.json`) covering the same surface: lab sanity, Direction 2 (teaching AS fixtures + document validation), Direction 1 (real PingFederate discovery and probe) and the H2 2026 gateway simulation, labelled `(MOCK ONLY)`.
+
+```
+node ../../shared/postman/generator.mjs --spec postman/spec.json            # regenerate the collection (never hand-edit it)
+node ../../shared/postman/fill-env.mjs  --spec postman/spec.json            # owner machine: fills postman/cimd-lab.live.environment.json from ~/Development/.env (git-ignored)
+npx newman run postman/cimd-lab.postman_collection.json -e postman/cimd-lab.live.environment.json
+```
+
+The committed `postman/cimd-lab.live.environment.example.json` carries placeholder values only; real settings never enter the repo. Direction 1 requests need the lab server running with `PF_BASE_URL` set (the environment maps the shared file's `PF_URL` key to it); they answer 409 `pf_not_configured` otherwise, which the collection's negative test accepts.
+
+`mcp/server.mjs` is a stdio MCP server that proxies a running lab as tools: `cimd_health`, `cimd_fetch_document`, `cimd_validate`, `cimd_pf_status`, `cimd_pf_probe`, `cimd_gateway_sim_evaluate`. It holds no state of its own; point it at the lab with `CIMD_LAB_BASE` (default `http://localhost:5250`):
+
+```
+npm install --prefix mcp
+CIMD_LAB_BASE=http://localhost:5250 node mcp/server.mjs
+```
+
+The gateway-simulation tool is labelled MOCK ONLY in its description, like the collection folder: the simulation has no live form.
+
 ## Health, doctor and reset
 
 ```

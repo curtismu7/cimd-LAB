@@ -1,0 +1,23 @@
+{
+  "name": "CIMD LAB — Live (example)",
+  "values": [
+    {
+      "key": "PF_BASE_URL",
+      "value": "PingFederate base URL (Direction 1 only; the shared env calls it PF_URL — map it here)",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "CIMD_CLIENT_ID_URL",
+      "value": "Public https URL of the lab's own CIMD document allowlisted in PingFederate (conformance/probe 'own' preset)",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "CIMD_REDIRECT_URI",
+      "value": "Public https callback URL paired with CIMD_CLIENT_ID_URL (hosted value: the hosted lab's /callback)",
+      "enabled": true,
+      "type": "secret"
+    }
+  ]
+}

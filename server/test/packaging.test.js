@@ -158,7 +158,7 @@ test('the hosted deployment names no secret and the repo carries no hosts other 
       if (skip.has(e.name)) continue;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(js|jsx|json|md|ya?ml|sh|mjs|html)$/.test(e.name) && e.name !== 'package-lock.json' && !/\.test\./.test(e.name)) {
+      else if (/\.(js|jsx|json|md|ya?ml|sh|mjs|html)$/.test(e.name) && e.name !== 'package-lock.json' && !/\.test\./.test(e.name) && !/\.live\.environment\.json$/.test(e.name)) {
         for (const m of fs.readFileSync(p, 'utf8').matchAll(/https?:\/\/([a-z0-9][a-z0-9.-]*)/gi)) {
           const h = m[1].toLowerCase();
           hosts.add(h);
@@ -169,13 +169,13 @@ test('the hosted deployment names no secret and the repo carries no hosts other 
   };
   walk(root);
   // IP literals are the tester's deliberate private-address cases; 'user' is the userinfo part of its credentials-in-URL case.
-  const allowed = (h) => /^[0-9.]+$/.test(h) || h === 'user' || h === 'client.dev' || h === 'raw.githubusercontent.com' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.example') || h.endsWith('.invalid');
+  const allowed = (h) => /^[0-9.]+$/.test(h) || h === 'user' || h === 'client.dev' || h === 'raw.githubusercontent.com' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.example') || h.endsWith('.invalid') || h === 'local.ping-devops.com' || h.endsWith('.local.ping-devops.com');
   // This app's own hosted address may be recorded in the two documents that must name it (README and the shelf entry), never in code.
   const OWN_HOST = 'cimd-lab.ai-demo.ping-devops.com';
   const OWN_DOCS = new Set(['README.md', 'docs/shelf-entry.json']);
   const ownOk = (h) => h === OWN_HOST && where.get(h).every((f) => OWN_DOCS.has(f));
   // Two more hosts appear in named files only: the family's repo URL and the CI gitleaks download (github.com), and the JSON Schema dialect id (json-schema.org).
-  const SCOPED = { 'github.com': new Set(['README.md', '.github/workflows/ci.yml', 'web/src/App.jsx']), 'json-schema.org': new Set(['docs/content-pack.schema.json']) };
+  const SCOPED = { 'github.com': new Set(['README.md', '.github/workflows/ci.yml', 'web/src/App.jsx']), 'json-schema.org': new Set(['docs/content-pack.schema.json']), 'schema.getpostman.com': new Set(['postman/cimd-lab.postman_collection.json']) };
   const scopedOk = (h) => Object.hasOwn(SCOPED, h) && where.get(h).every((f) => SCOPED[h].has(f));
   assert.deepEqual([...hosts].filter((h) => !allowed(h) && !ownOk(h) && !scopedOk(h)).sort(), []);
 });
