@@ -47,7 +47,7 @@ function H2Body({ resetKey, presenter, source }) {
   const [form, setForm] = useState(null);
   const [run, setRun] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [runKey, setRunKey] = useState(0);
+  const [runKey, setRunKey] = useState(); // undefined: nothing tried yet; null: the last attempt began no run; else the id of the run it began
   const seq = useRef(0);
 
   useEffect(() => {
@@ -69,8 +69,8 @@ function H2Body({ resetKey, presenter, source }) {
     const mine = ++seq.current;
     setBusy(true);
     const r = await api.gatewaySimEvaluate(fromForm(form));
-    setRunKey((k) => k + 1);
     if (mine !== seq.current) return; // a newer run owns the screen
+    setRunKey(r.runId);
     setRun(r);
     setBusy(false);
   };

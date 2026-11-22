@@ -58,7 +58,9 @@ const STRONG = '(?:client_secret|client_assertion|secret_key|private_key|api[_-]
 const WEAK = '(?:token|pass|sid|session)';
 const SECRET_KEY = /(secret|token|password|passwd|authorization|api[-_]?key|private[-_]?key|credential|cookie|assertion|code_verifier|session[-_]?id|jsessionid|phpsessid)/i;
 const SHORT_KEYS = /^(pass|pwd|sid|session|token)$/i;
-const TLDS = 'com|org|net|io|dev|app|cloud|local|internal|example|invalid|test|localhost|lan|corp|svc|ai|co|us|uk|de|eu|info|biz|edu|gov|int|me|tech';
+// Real-looking host suffixes. `example`, `invalid` and `localhost` are NOT here on purpose (RFC 2606 / 6761 reserved: they can never be a real host), so a
+// demo host such as client.example or a.b.example stays readable, while example.com, my.example.com and x.example.evil.net still end in a listed suffix and are masked.
+const TLDS = 'com|org|net|io|dev|app|cloud|local|internal|test|lan|corp|svc|ai|co|us|uk|de|eu|info|biz|edu|gov|int|me|tech';
 const IPV6 = '(?<![\\w:])(?:(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}|(?:[0-9a-f]{1,4}:){1,7}:(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?|::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6}))(?![\\w:])';
 const EMAIL = '[\\w.+-]{1,64}@[\\w-]{1,63}(?:\\.[\\w-]{1,63}){1,8}';
 const HOST = `\\b[a-z0-9-]{1,63}(?:\\.[a-z0-9-]{1,63}){0,8}\\.(?:${TLDS})\\b(?!\\.[a-z0-9])`;

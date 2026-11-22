@@ -10,14 +10,16 @@ import { mockRecord, realRecord } from './run-observability/fixtures.js';
 
 let reply;
 let calls;
+let testerRunId;
 const json = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 beforeEach(() => {
   setJsonView('raw');
   calls = [];
+  testerRunId = 'tester-0123456789ab';
   reply = () => json({ record: null, offered: true, message: 'No tester run yet. Press "Run the tester".' });
   vi.stubGlobal('fetch', vi.fn(async (url, init) => {
     calls.push(`${init?.method ?? 'GET'} ${url}`);
-    if (url === '/api/tester/run') return json({ error: 'tester_failed' }, 500);
+    if (url === '/api/tester/run') return { ...json({ error: 'tester_failed' }, 500), headers: { get: (n) => (n === 'x-run-id' && testerRunId) || null } };
     if (String(url).startsWith('/api/run-observability/')) return reply();
     return json({});
   }));
@@ -78,23 +80,36 @@ describe('RunRecord', () => {
 
   it('reads again when the mode switches, in both directions, and when a run finished', async () => {
     reply = () => json({ record: mockRecord, offered: true });
-    const { rerender } = render(<RunRecord kind="tester" source="mock" runKey={0} />);
+    const { rerender } = render(<RunRecord kind="tester" source="mock" runKey="tester-aaaaaaaaaaaa" />);
     await screen.findByTestId('ro-table');
     expect(screen.getByTestId('ro-coverage-person')).toHaveTextContent('Simulated');
     reply = () => json({ record: realRecord, offered: true });
-    rerender(<RunRecord kind="tester" source="real" runKey={0} />);
+    rerender(<RunRecord kind="tester" source="real" runKey="tester-aaaaaaaaaaaa" />);
     await waitFor(() => expect(screen.getByTestId('ro-coverage-person')).toHaveTextContent('Logged'));
     reply = () => json({ record: mockRecord, offered: true });
-    rerender(<RunRecord kind="tester" source="mock" runKey={0} />);
+    rerender(<RunRecord kind="tester" source="mock" runKey="tester-aaaaaaaaaaaa" />);
     await waitFor(() => expect(screen.getByTestId('ro-coverage-person')).toHaveTextContent('Simulated'));
     const before = reads();
-    rerender(<RunRecord kind="tester" source="mock" runKey={1} />);
+    rerender(<RunRecord kind="tester" source="mock" runKey="tester-bbbbbbbbbbbb" />);
     await waitFor(() => expect(reads()).toBe(before + 1));
   });
 });
 
 describe('the Lab as server page', () => {
-  it('reads the record again after the tester run, also when the run failed', async () => {
+  it('an attempt that began no run shows no older record under it and reads nothing', async () => {
+    testerRunId = null;
+    reply = () => json({ record: mockRecord, offered: true });
+    const user = userEvent.setup();
+    render(<LabView resetKey={0} source="mock" />);
+    await screen.findByTestId('ro-table');
+    const before = reads();
+    await user.click(screen.getByRole('button', { name: 'Run the tester' }));
+    expect(await screen.findByTestId('run-record-none')).toHaveTextContent(/began no run/);
+    expect(screen.queryByTestId('ro-table')).toBeNull();
+    expect(reads()).toBe(before);
+  });
+
+  it('reads the record again after the tester run, also when the run failed after it began', async () => {
     const user = userEvent.setup();
     render(<LabView resetKey={0} source="mock" />);
     await screen.findByTestId('ro-empty');

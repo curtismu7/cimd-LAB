@@ -21,8 +21,8 @@ export function Trace({ trace }) {
 export default function LabView({ resetKey, source }) {
   const [run, setRun] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [runKey, setRunKey] = useState(0);
-  const start = async () => { setBusy(true); setRun(await api.tester()); setBusy(false); setRunKey((k) => k + 1); };
+  const [runKey, setRunKey] = useState(); // undefined: nothing tried yet; null: the last attempt began no run; else the id of the run it began
+  const start = async () => { setBusy(true); const r = await api.tester(); setRun(r); setBusy(false); setRunKey(r.runId); };
   const data = run?.data;
   return (
     <div className="view" key={resetKey}>

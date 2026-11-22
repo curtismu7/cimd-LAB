@@ -72,7 +72,7 @@ test('a vendored byte edited, or a file added to the vendored folders without th
 test('Mock: a tester run is a simulated record whose row times are the times of the stdout lines', async () => {
   const lab = await start();
   try {
-    assert.deepEqual(await lab.record('tester'), { record: null, offered: true, message: 'No tester run yet. Press "Run the tester": the record of that run appears here.' });
+    assert.deepEqual(await lab.record('tester'), { record: null, offered: true, message: 'No tester run in this mode yet. Press "Run the tester": the record of that run appears here.' });
     assert.equal((await lab.post('/api/tester/run')).status, 200);
     const { record, offered } = await lab.record('tester');
     assert.equal(offered, true);
@@ -92,21 +92,35 @@ test('Mock: a tester run is a simulated record whose row times are the times of 
   } finally { await lab.close(); }
 });
 
-test('Real: the same run is a record of response rows (replies the lab received), never logged, and the mode switch works in both directions', async () => {
+test('a record belongs to the mode its run was made in: Mock events are never re-labelled as Real responses, and the switch works in both directions', async () => {
   const lab = await start({ env: REAL_ENV });
   try {
-    await lab.post('/api/tester/run');
-    assert.equal((await lab.record('tester')).record.source, 'mock');
+    const first = await lab.post('/api/tester/run');
+    const mockRun = first.headers.get('x-run-id');
+    assert.match(mockRun, /^tester-[0-9a-f]{12}$/);
+    const mock = (await lab.record('tester')).record;
+    assert.equal(mock.source, 'mock');
+    assert.equal(mock.runId, mockRun);
     assert.equal((await lab.post('/api/mode', { source: 'real' })).status, 200);
+    // The same 17 Mock-computed events must not come back as a Real record.
+    const none = await lab.record('tester');
+    assert.equal(none.record, null);
+    assert.equal(none.offered, true);
+    assert.match(none.message, /No tester run in this mode yet/);
+    const second = await lab.post('/api/tester/run');
+    const realRun = second.headers.get('x-run-id');
+    assert.notEqual(realRun, mockRun);
     const real = (await lab.record('tester')).record;
     assert.deepEqual(assertRunObservability(real), []);
     assert.equal(real.source, 'real');
+    assert.equal(real.runId, realRun);
     assert.equal(real.coverage.authorize, 'response');
-    assert.ok(real.rows.filter((r) => r.origin !== 'not-logged').every((r) => r.origin === 'response'));
+    assert.ok(real.rows.filter((r) => r.origin !== 'not-logged').every((r) => r.origin === 'response' && r.product === "the lab's own authorization server, in this process"));
     assert.ok(!real.rows.some((r) => r.origin === 'logged' || r.origin === 'simulated'));
     assert.equal((await lab.post('/api/mode', { source: 'mock' })).status, 200);
     const back = (await lab.record('tester')).record;
     assert.equal(back.source, 'mock');
+    assert.equal(back.runId, mockRun, 'switching back shows the run made in Mock');
     assert.equal(back.coverage.authorize, 'simulated');
     const info = await (await fetch(`${lab.base}/api/info`)).json();
     assert.equal(info.source, 'mock');
@@ -114,7 +128,7 @@ test('Real: the same run is a record of response rows (replies the lab received)
   } finally { await lab.close(); }
 });
 
-test('the probe: Mock offers no record (PingFederate is not mocked); Real shows the reply as one response row, only a 400 and a move to sign-in are decisions', async () => {
+test('the probe: Mock offers no record (PingFederate is not mocked); Real shows the reply as one response row that is information, the lab\'s reading and not a reported decision', async () => {
   const replies = {
     refused: () => new Response('<html>no</html>', { status: 400 }),
     allowed: () => new Response('<form>username</form>', { status: 200 }),
@@ -130,7 +144,7 @@ test('the probe: Mock offers no record (PingFederate is not mocked); Real shows 
     assert.equal(mock.record, null);
     assert.match(mock.message, /PingFederate is not mocked/);
     await lab.post('/api/mode', { source: 'real' });
-    for (const [name, want] of [['refused', 'refused'], ['allowed', 'allowed'], ['info', 'info'], ['redirect', 'allowed']]) {
+    for (const [name, reading] of [['refused', /not accepted \(the reply does not say why\)/], ['allowed', /moved on to sign-in/], ['info', /neither accepted nor not accepted/], ['redirect', /moved on to sign-in/]]) {
       reply = replies[name];
       await lab.post('/api/pf/probe', { preset: 'client.dev', confirm: true });
       const { record } = await lab.record('probe');
@@ -138,7 +152,11 @@ test('the probe: Mock offers no record (PingFederate is not mocked); Real shows 
       const rows = record.rows.filter((r) => r.origin !== 'not-logged');
       assert.equal(rows.length, 1, name);
       assert.equal(rows[0].origin, 'response');
-      assert.equal(rows[0].outcome, want, name);
+      assert.equal(rows[0].outcome, 'info', `${name}: PingFederate reports no decision, so the row is information`);
+      assert.match(rows[0].message, /The lab reads this reply as:/);
+      assert.match(rows[0].message, reading);
+      assert.match(rows[0].message, /PingFederate reported no decision/);
+      assert.deepEqual(record.summary, { allowed: 0, refused: 0, blocked: 0, info: 1, unverified: 0 });
       assert.equal(rows[0].layer, 'authorize');
     }
     reply = () => { throw new TypeError('connect ECONNREFUSED'); };
@@ -244,27 +262,31 @@ test('one run per record: two overlapping runs, and a decision made by someone e
   } finally { await lab.close(); }
 });
 
-test('events after a run is closed do not join it, the list is bounded per workspace, and an open run is never evicted', () => {
+test('events after a run is closed do not join it, the list is bounded per kind and mode, and an open run is never evicted', () => {
   const written = [];
   const log = createRunLog({ now: () => Date.UTC(2026, 10, 22, 10, 0, 0), write: (l) => written.push(l) });
-  const run = log.begin('w', 'tester');
+  const run = log.begin('w', 'tester', 'mock');
   log.record('w', run.id, { step: 'authorize', outcome: 'allowed', client: 'https://a.example/x' });
   log.end('w', run.id);
   log.record('w', run.id, { step: 'authorize', outcome: 'allowed', client: 'https://a.example/x' });
-  assert.equal(log.latest('w', 'tester').events.length, 1);
+  assert.equal(log.latest('w', 'tester', 'mock').events.length, 1);
   assert.equal(written.length, 2, 'the late decision is still logged to stdout');
   log.record('other-workspace', run.id, { step: 'authorize', outcome: 'allowed', client: 'x' });
-  assert.equal(log.latest('w', 'tester').events.length, 1, 'a run id is only honoured in its own workspace');
-  const open = log.begin('w', 'probe');
-  for (let i = 0; i < 20; i += 1) log.end('w', log.begin('w', 'h2').id);
+  assert.equal(log.latest('w', 'tester', 'mock').events.length, 1, 'a run id is only honoured in its own workspace');
+  const open = log.begin('w', 'probe', 'real');
+  for (let i = 0; i < 20; i += 1) log.end('w', log.begin('w', 'h2', 'mock').id);
   log.record('w', open.id, { step: 'probe', outcome: 'info', client: 'x', text: 't' });
   assert.equal(open.events.length, 1);
-  assert.equal(log.latest('w', 'probe'), null, 'an open run is not a record yet');
+  assert.equal(log.latest('w', 'probe', 'real'), null, 'an open run is not a record yet');
   log.end('w', open.id);
-  assert.equal(log.latest('w', 'probe').id, open.id, 'the open run survived 20 newer runs');
-  assert.equal(log.latest('w', 'tester'), null, 'the oldest closed run was evicted at the cap of 8');
+  assert.equal(log.latest('w', 'probe', 'real').id, open.id, 'the open run survived 20 newer runs of another kind');
+  assert.equal(log.latest('w', 'probe', 'mock'), null, 'a run is only found in the mode it was made in');
+  assert.equal(log.latest('w', 'tester', 'mock').id, run.id, 'other kinds never push a run out');
+  const kept = [log.begin('w', 'tester', 'mock'), log.begin('w', 'tester', 'mock'), log.begin('w', 'tester', 'mock'), log.begin('w', 'tester', 'mock')].map((r) => { log.end('w', r.id); return r.id; });
+  assert.equal(log.latest('w', 'tester', 'mock').id, kept[3]);
+  assert.equal(log.latest('w', 'h2', 'mock') !== null, true);
   log.drop('w');
-  assert.equal(log.latest('w', 'probe'), null);
+  assert.equal(log.latest('w', 'probe', 'real'), null);
 });
 
 test('the workspace gives the run id only to a loopback caller holding the grant', () => {
@@ -280,21 +302,23 @@ test('the workspace gives the run id only to a loopback caller holding the grant
 
 test('declared and undeclared ids: an undeclared 32-hex id is shown as <id>, a long record is not marked cut, and a Mock record holds no logged row', async () => {
   const hex = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
-  const run = { id: 'tester-0123456789ab', kind: 'tester', startedAt: '2026-11-22T10:00:00.000Z', endedAt: '2026-11-22T10:00:05.000Z', events: [
+  const run = { id: 'tester-0123456789ab', kind: 'tester', source: 'mock', startedAt: '2026-11-22T10:00:00.000Z', endedAt: '2026-11-22T10:00:05.000Z', events: [
     { step: 'authorize', outcome: 'refused', check: 'pkce', text: 'PKCE is required', client: `https://client.example/${hex}/c.json`, at: '2026-11-22T10:00:01.000Z', detail: { checks: 4 } },
   ] };
-  const record = await buildRunRecord({ source: 'mock', kind: 'tester', run });
+  const record = await buildRunRecord({ kind: 'tester', run });
   assert.deepEqual(assertRunObservability(record), []);
   assert.equal(record.truncated, false);
   const row = record.rows.find((r) => r.origin === 'simulated');
   assert.ok(row.message.includes('<id>') && !row.message.includes(hex));
   assert.ok(!record.rows.some((r) => r.origin === 'logged'));
-  await assert.rejects(() => buildRunRecord({ source: 'bogus', kind: 'tester', run }), /source must be mock or real/);
+  await assert.rejects(() => buildRunRecord({ kind: 'tester', run: { ...run, source: 'bogus' } }), /source must be mock or real/);
 });
 
 test('describe() never presents a refusal as a pass or invents a hop: each sentence follows its event', () => {
   assert.match(describeEvent({ step: 'authorize', outcome: 'refused', check: 'pkce', text: 'PKCE is required', client: 'c' }), /^The lab's server stopped the request at the pkce check/);
   assert.match(describeEvent({ step: 'approve', outcome: 'allowed', client: 'c' }), /No person was asked/);
+  assert.match(describeEvent({ step: 'approve', outcome: 'refused', check: 'consent', client: 'c' }), /gave no allow answer/);
+  assert.ok(!/answered deny/.test(describeEvent({ step: 'approve', outcome: 'refused', check: 'consent', client: 'c' })));
   assert.match(describeEvent({ step: 'exchange', outcome: 'refused', check: 'code', client: 'c' }), /issued no access token/);
   assert.match(describeEvent({ step: 'register', outcome: 'allowed', via: 'dcr', fellBackFrom: 'not_allowlisted', client: 'c' }), /through dynamic registration after CIMD stopped at not_allowlisted/);
 });
@@ -333,4 +357,52 @@ test('the record route: unknown kind 404 JSON, GET only, Reset clears the record
     assert.equal((await lab.record('tester')).record, null);
     assert.deepEqual(await (await fetch(`${lab.base}/api/info`)).json(), before);
   } finally { await lab.close(); }
+});
+
+test('the newest run of each kind survives runs of the other kinds: after one Live evaluate and nine tester runs the Live record is still there', async () => {
+  const lab = await start();
+  const GOOD = { gatewayAdvertisesCimd: true, gatewayOffersDcr: true, clientSupportsCimd: true, clientSupportsDcr: true, allowlist: ['https://client.example/oauth/client.json'], clientIdUrl: 'https://client.example/oauth/client.json', document: 'good', onCimdFailure: 'refuse', attempts: 1 };
+  try {
+    const h2 = (await lab.post('/api/gateway-sim/evaluate', GOOD)).headers.get('x-run-id');
+    for (let i = 0; i < 9; i += 1) await lab.post('/api/tester/run');
+    const { record } = await lab.record('h2');
+    assert.ok(record, 'the Live record is still there');
+    assert.equal(record.runId, h2);
+  } finally { await lab.close(); }
+});
+
+test('a call that began no run carries no run id and leaves the previous record alone: a bad field, a probe refused before the request', async () => {
+  const lab = await start({ env: { ...REAL_ENV, CIMD_CLIENT_ID_URL: 'http://client.example/c.json', CIMD_REDIRECT_URI: 'https://lab.example/cb' }, pfReply: () => new Response('', { status: 302, headers: { location: 'https://pf.invalid:9031/as/login' } }) });
+  const GOOD = { gatewayAdvertisesCimd: true, gatewayOffersDcr: true, clientSupportsCimd: true, clientSupportsDcr: true, allowlist: ['https://client.example/oauth/client.json'], clientIdUrl: 'https://client.example/oauth/client.json', document: 'good', onCimdFailure: 'refuse', attempts: 1 };
+  try {
+    const ok = await lab.post('/api/gateway-sim/evaluate', GOOD);
+    const run = ok.headers.get('x-run-id');
+    const bad = await lab.post('/api/gateway-sim/evaluate', { ...GOOD, attempts: 99 });
+    assert.equal(bad.status, 400);
+    assert.equal(bad.headers.get('x-run-id'), null);
+    assert.equal((await lab.record('h2')).record.runId, run);
+    await lab.post('/api/mode', { source: 'real' });
+    const probe = await lab.post('/api/pf/probe', { preset: 'client.dev', confirm: true });
+    const probeRun = probe.headers.get('x-run-id');
+    assert.ok(probeRun);
+    const refused = await lab.post('/api/pf/probe', { preset: 'own', confirm: true }); // PfRefused: the client_id is not https, nothing is sent
+    assert.equal(refused.status, 400);
+    assert.equal(refused.headers.get('x-run-id'), null);
+    assert.equal((await lab.record('probe')).record.runId, probeRun);
+  } finally { await lab.close(); }
+});
+
+test('an engine that throws after the run began cannot leave an open run: the run is closed with no event', async () => {
+  const server = http.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  server.on('request', createApp({ port, env: {}, simulate: () => ({}) }));
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    const r = await fetch(`${base}/api/gateway-sim/evaluate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(r.status, 500);
+    const body = await (await fetch(`${base}/api/run-observability/h2`)).json();
+    assert.ok(body.record, 'the run is closed, so it is a record');
+    assert.equal(body.record.coverage.gateway, 'not-logged');
+  } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
 });

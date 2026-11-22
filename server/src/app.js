@@ -104,7 +104,8 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   // Run observability (rule 27): the decisions of each run, one stdout line each (logLine), read back by /api/run-observability/:kind.
   const runs = createRunLog({ now, write: logLine });
   const workspaces = createWorkspaces({ hosted, local: env.WORKSPACE, now, onEvict: (id) => { auth.drop(id); runs.drop(id); } });
-  const beginRun = (req, kind) => { workspaces.touch(req.workspaceId); return runs.begin(req.workspaceId, kind); };
+  // A run is made in the mode the lab is in now. The response carries its id (X-Run-Id), so the page knows an attempt began a run.
+  const beginRun = (req, res, kind) => { workspaces.touch(req.workspaceId); const run = runs.begin(req.workspaceId, kind, source); res.set('X-Run-Id', run.id); return run; };
   // Rule 19: source is 'mock' (the lab's teaching server only, the default) or 'real' (the same lab plus a real
   // PingFederate sign-in for the person at the page). Real needs the PF sign-in client configured.
   const pfConfig = () => {
@@ -309,16 +310,18 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
   app.get('/api/gateway-sim/mock', (req, res) => res.set('Cache-Control', 'no-store').json(MOCK_TABLE));
   app.post('/api/gateway-sim/evaluate', limit('gateway-sim'), express.json({ limit: '64kb' }), (req, res) => {
+    let run;
     try {
       const result = maskDeep(simulate(req.body, { traceId: crypto.randomBytes(16).toString('hex') }));
-      const run = beginRun(req, 'h2');
+      run = beginRun(req, res, 'h2');
       const { outcome, via, reason, fellBackFrom } = result.summary;
       runs.record(req.workspaceId, run.id, { step: 'register', outcome: outcome === 'registered' ? 'allowed' : 'refused', check: reason ?? via, via, fellBackFrom, client: result.input?.clientIdUrl, detail: { attempts: result.attempts?.length } });
-      runs.end(req.workspaceId, run.id);
       res.set('Cache-Control', 'no-store').json(result);
     } catch (error) {
       if (!(error instanceof SimRefused)) return res.status(500).json({ error: 'server_error' });
       return res.status(400).json({ error: error.code, ...(error.field ? { field: error.field } : {}) });
+    } finally {
+      if (run) runs.end(req.workspaceId, run.id);
     }
   });
 
@@ -328,7 +331,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     let run;
     let obsRun;
     try {
-      obsRun = beginRun(req, 'tester');
+      obsRun = beginRun(req, res, 'tester');
       run = workspaces.grantInternal(req.workspaceId, obsRun.id);
       res.set('Cache-Control', 'no-store').json(await runServerTests({ asBase: `${origin}/as`, fixtureBase: origin, fetchImpl, headers: { 'x-cimd-internal': run.grant } }));
     } catch {
@@ -369,12 +372,12 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
         if (!pf.ownClientId || !pf.ownRedirectUri) return res.status(409).json({ error: 'own_client_not_configured', detail: 'Set CIMD_CLIENT_ID_URL and CIMD_REDIRECT_URI to a public https address PingFederate can reach' });
         ({ ownClientId: clientId, ownRedirectUri: redirectUri } = pf);
       } else return res.status(400).json({ error: 'unknown_preset' });
-      const run = beginRun(req, 'probe');
-      try {
-        const result = await probePf({ base: pf.base, clientId, redirectUri, fetchImpl });
-        runs.record(req.workspaceId, run.id, probeEvent(clientId, result));
-        res.set('Cache-Control', 'no-store').json(result);
-      } finally { runs.end(req.workspaceId, run.id); }
+      const result = await probePf({ base: pf.base, clientId, redirectUri, fetchImpl });
+      // The run begins with its first event: a probe that never reached PingFederate (refused before the request) leaves the previous record alone.
+      const run = beginRun(req, res, 'probe');
+      runs.record(req.workspaceId, run.id, probeEvent(clientId, result));
+      runs.end(req.workspaceId, run.id);
+      res.set('Cache-Control', 'no-store').json(result);
     } catch (error) {
       res.status(error instanceof PfRefused ? 400 : 500).json({ error: error instanceof PfRefused ? error.message : 'pf_probe_failed' });
     }
@@ -398,10 +401,10 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     if (!KINDS.includes(kind)) return res.status(404).json({ error: 'unknown_kind', message: `No run observability for "${kind.slice(0, 40)}".` });
     res.set('Cache-Control', 'no-store');
     if (OFFERED[kind]?.[source]) return res.json({ record: null, offered: false, message: OFFERED[kind][source] });
-    const run = runs.latest(req.workspaceId, kind);
+    const run = runs.latest(req.workspaceId, kind, source);
     if (!run) return res.json({ record: null, offered: true, message: NO_RUN[kind] });
     try {
-      return res.json({ record: await buildRunRecord({ source, kind, run }), offered: true });
+      return res.json({ record: await buildRunRecord({ kind, run }), offered: true });
     } catch (error) {
       const known = error instanceof RunObsError;
       console.error('run-observability:', known ? error.code : 'unexpected', known ? error.message : String(error?.message).slice(0, 200));

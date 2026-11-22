@@ -50,12 +50,12 @@ export default function PfView({ resetKey, source }) {
   const [probe, setProbe] = useState(null);
   const [conformance, setConformance] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [runKey, setRunKey] = useState(0);
+  const [runKey, setRunKey] = useState(); // undefined: nothing tried yet; null: the last attempt began no run; else the id of the run it began
 
   useEffect(() => { let live = true; api.config().then((r) => live && setConfig(r)); return () => { live = false; }; }, []);
 
   const checkStatus = async () => { setBusy(true); setStatus(await api.pfStatus()); setBusy(false); };
-  const runProbe = async () => { setBusy(true); setProbe(await api.pfProbe(preset)); setBusy(false); setRunKey((k) => k + 1); };
+  const runProbe = async () => { setBusy(true); const r = await api.pfProbe(preset); setProbe(r); setBusy(false); setRunKey(r.runId); };
   const runConformance = async () => { setBusy(true); setConformance(await api.pfConformance()); setBusy(false); };
   const s = status?.data;
   // Once the config has loaded, no PF_BASE_URL means nothing may be sent.

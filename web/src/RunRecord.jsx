@@ -22,7 +22,7 @@ const PF_LOG = {
 };
 const STREAMS = { tester: [LAB_LOG], probe: [PF_LOG, LAB_LOG], h2: [LAB_LOG] };
 
-export default function RunRecord({ kind, source, runKey = 0 }) {
+export default function RunRecord({ kind, source, runKey }) {
   const [state, setState] = useState({ loading: true });
   const seq = useRef(0);
   const known = source === 'mock' || source === 'real';
@@ -30,6 +30,7 @@ export default function RunRecord({ kind, source, runKey = 0 }) {
   useEffect(() => {
     if (!known) return undefined;
     const mine = ++seq.current;
+    if (runKey === null) { setState({ noRun: true }); return undefined; } // the last attempt began no run: never show an older record under it
     setState({ loading: true });
     api.runObservability(kind).then((r) => {
       if (mine !== seq.current) return; // a newer read owns the panel
@@ -43,6 +44,7 @@ export default function RunRecord({ kind, source, runKey = 0 }) {
   return (
     <section className="card" data-testid={`run-record-${kind}`}>
       {state.loading ? <p className="hint" data-testid="run-record-loading">Reading this run's record.</p>
+        : state.noRun ? <p data-testid="run-record-none">That attempt began no run, so there is no record for it.</p>
         : state.offered === false ? (
           <>
             <h3>What each layer logged for this run</h3>

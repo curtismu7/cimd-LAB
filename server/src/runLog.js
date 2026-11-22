@@ -29,18 +29,20 @@ const STAGE = {
   document_invalid: 'document-rules', no_registration_path: 'no-path',
 };
 
-const MAX_RUNS = 8; // per workspace; closed runs go first, an open run is never evicted
+const KEEP = 3; // closed runs kept per workspace, kind and mode: the newest plus two more; an open run is never evicted
 
 export function createRunLog({ now = Date.now, write = () => {} } = {}) {
   const spaces = new Map(); // workspaceId -> Map(runId -> run); a closed run moves to the end, so the last closed one is the newest
+  // A run belongs to the mode (mock or real) it was made in; a record is never built for the other mode.
   const iso = () => new Date(now()).toISOString();
 
-  function begin(workspaceId, kind) {
-    const run = { id: `${kind}-${crypto.randomBytes(6).toString('hex')}`, kind, startedAt: iso(), endedAt: null, events: [] };
+  function begin(workspaceId, kind, source) {
+    const run = { id: `${kind}-${crypto.randomBytes(6).toString('hex')}`, kind, source, startedAt: iso(), endedAt: null, events: [] };
     let runs = spaces.get(workspaceId);
     if (!runs) { runs = new Map(); spaces.set(workspaceId, runs); }
     runs.set(run.id, run);
-    for (const [id, r] of runs) { if (runs.size <= MAX_RUNS) break; if (r.endedAt) runs.delete(id); }
+    const same = [...runs.values()].filter((r) => r.kind === kind && r.source === source && r.endedAt);
+    for (const r of same.slice(0, Math.max(0, same.length - KEEP))) runs.delete(r.id);
     return run;
   }
 
@@ -61,8 +63,8 @@ export function createRunLog({ now = Date.now, write = () => {} } = {}) {
     runs.set(runId, run);
   }
 
-  // The newest CLOSED run of this kind: a record never holds a half-open run, so it never mixes two overlapping runs.
-  const latest = (workspaceId, kind) => [...(spaces.get(workspaceId)?.values() ?? [])].filter((r) => r.kind === kind && r.endedAt).at(-1) ?? null;
+  // The newest CLOSED run of this kind made in this mode: a record never holds a half-open run, so it never mixes two overlapping runs.
+  const latest = (workspaceId, kind, source) => [...(spaces.get(workspaceId)?.values() ?? [])].filter((r) => r.kind === kind && r.source === source && r.endedAt).at(-1) ?? null;
 
   return { begin, record, end, latest, drop: (workspaceId) => { spaces.delete(workspaceId); } };
 }
@@ -80,7 +82,7 @@ export function describe(e) {
         : `The lab's server stopped the request at the ${e.check} check: ${e.text}.${client}`;
     case 'approve':
       if (e.outcome === 'allowed') return `The caller answered allow and the server issued an authorization code. No person was asked.${client}`;
-      return e.check === 'pending' ? `The server did not know that pending request: ${e.text}.${client}` : `The caller answered deny and the server sent access_denied to the redirect.${client}`;
+      return e.check === 'pending' ? `The server did not know that pending request: ${e.text}.${client}` : `The caller gave no allow answer, so the server sent access_denied to the redirect.${client}`;
     case 'exchange':
       return e.outcome === 'allowed'
         ? `The server issued an access token (the value is not shown here).${client}`
@@ -124,26 +126,29 @@ const EMPTY = {
   h2: 'This run made no decision.',
 };
 const PRODUCT = {
-  tester: { mock: 'lab mock server', real: 'lab server reply' },
+  tester: { mock: 'lab mock server', real: "the lab's own authorization server, in this process" },
   probe: { real: 'PingFederate reply' },
   h2: { mock: 'gateway simulation' },
 };
 
 export const KINDS = ['tester', 'probe', 'h2'];
 export const NO_RUN = {
-  tester: 'No tester run yet. Press "Run the tester": the record of that run appears here.',
-  probe: 'No probe run yet. Press "Run probe": the record of that run appears here.',
-  h2: 'No Live run yet. Press "Evaluate": the record of that run appears here.',
+  tester: 'No tester run in this mode yet. Press "Run the tester": the record of that run appears here.',
+  probe: 'No probe run in this mode yet. Press "Run probe": the record of that run appears here.',
+  h2: 'No Live run in this mode yet. Press "Evaluate": the record of that run appears here.',
 };
 
-// What PingFederate answered to the probe, as one event. Only an HTTP 400 and a move on to sign-in are decisions; everything else is information.
+// What PingFederate answered to the probe, as one event. PingFederate reports no decision on this request: the verdict is the LAB's reading of
+// the HTTP reply (rule 25: an inferred decision is never presented as reported), so every probe row is information and says so.
 export function probeEvent(client, r) {
-  const base = { step: 'probe', client, detail: { status: r.status, verdict: r.verdict } };
-  if (!r.reachable) return { ...base, outcome: 'info', result: 'no-reply', text: 'PingFederate did not answer' };
-  if (r.verdict === 'rejected') return { ...base, outcome: 'refused', text: `PingFederate answered HTTP ${r.status} and did not accept the client.` };
-  if (r.verdict === 'accepted') return { ...base, outcome: 'allowed', text: `PingFederate answered HTTP ${r.status} and moved on to sign-in for the client.` };
-  if (r.verdict === 'client-accepted-sign-in-failed') return { ...base, outcome: 'info', text: `PingFederate accepted the client, then sent an error to the redirect URI (HTTP ${r.status}).` };
-  return { ...base, outcome: 'info', text: `PingFederate answered HTTP ${r.status}; the lab cannot read that as accepted or refused.` };
+  const base = { step: 'probe', client, outcome: 'info', detail: { status: r.status, verdict: r.verdict } };
+  if (!r.reachable) return { ...base, result: 'no-reply', text: 'PingFederate did not answer' };
+  const reading = {
+    rejected: 'the client was not accepted (the reply does not say why)',
+    accepted: 'it moved on to sign-in (a redirect with a Location, or a page with a login form)',
+    'client-accepted-sign-in-failed': 'the client was accepted and sign-in then stopped (an error was sent to the redirect URI)',
+  }[r.verdict] ?? 'neither accepted nor not accepted';
+  return { ...base, text: `PingFederate answered HTTP ${r.status}. The lab reads this reply as: ${reading}. PingFederate reported no decision.` };
 }
 
 export const OFFERED = {
@@ -151,7 +156,8 @@ export const OFFERED = {
   h2: { real: 'There is no Real record for the gateway simulation: the engine makes no network call, receives no reply and no product logs it. Switch to Mock to see the simulated row.' },
 };
 
-export async function buildRunRecord({ source, kind, run, clock = Date.now }) {
+export async function buildRunRecord({ kind, run, clock = Date.now }) {
+  const { source } = run;
   const rows = run.events.filter((e) => !e.result).map((e) => ({ at: e.at, product: PRODUCT[kind][source], outcome: e.outcome, message: describe(e), detail: { run: run.id, step: e.step, check: e.check, ...e.detail } }));
   const layers = LAYERS.map((layer) => {
     if (layer === ACTIVE[kind]) return { layer, products: [], [source === 'mock' ? 'simulated' : 'responses']: rows, reason: EMPTY[kind] };
