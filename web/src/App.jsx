@@ -208,7 +208,7 @@ export default function App() {
         )}
         <p className="sr-only" role="status">{resetNote}</p>
         <main id="tabpanel" {...(presenter ? {} : { role: 'tabpanel', 'aria-labelledby': `tab-${tab}` })}>
-          <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} />
+          <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} source={info?.source} />
         </main>
       </div>
       <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={talkSteps} />

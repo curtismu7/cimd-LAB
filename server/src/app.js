@@ -17,6 +17,8 @@ import { CLAIMS, TAGS, NOT_STATED, WHY, SLIDE, BANNER_TEXT } from './gateway-sim
 import { MOCK_TABLE } from './gateway-sim-table.js';
 import { maskDeep } from './mask.js';
 import { shelfInfo } from './shelfLink.js';
+import { RunObsError } from './runObservability.js';
+import { createRunLog, buildRunRecord, probeEvent, KINDS, OFFERED, NO_RUN } from './runLog.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
 const MAX_PASTED_BYTES = 16 * 1024;
@@ -65,7 +67,7 @@ const ROUTE_METHODS = new Map([
 const routeKey = (pathname) => (pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname).toLowerCase();
 const allowedMethods = (pathname) => {
   const key = routeKey(pathname);
-  return /^\/api\/stories\/[^/]+$/.test(key) || /^\/fixtures\/[^/]+\.json$/.test(key) ? GET : ROUTE_METHODS.get(key) ?? null;
+  return /^\/api\/(?:stories|run-observability)\/[^/]+$/.test(key) || /^\/fixtures\/[^/]+\.json$/.test(key) ? GET : ROUTE_METHODS.get(key) ?? null;
 };
 // An address with no file extension and outside /api, /as, /fixtures and /assets is a page (the web UI answers it); the same test serves the page and refuses a POST to it.
 const PAGE_PATH = /^\/(?!api(\/|$)|as(\/|$)|fixtures(\/|$)|assets(\/|$))(?:[^/]*\/)*[^/.]*$/;
@@ -80,7 +82,7 @@ export function jsonErrorHandler(err, req, res, next) {
   return res.status(500).json({ error: 'server_error' });
 }
 
-export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile, simulate = evaluate } = {}) {
+export function createApp({ port, env = process.env, fetchImpl = fetch, webDist = DEFAULT_WEB_DIST, now = Date.now, customerFile, simulate = evaluate, logLine = () => {} } = {}) {
   const app = express();
   // customer.config.json (or CUSTOMER_CONFIG): validated once at start; bad fields fall back and are reported.
   const customer = loadCustomerConfig({ file: customerFile, env });
@@ -99,7 +101,11 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   // Optional: ALLOWED_CLIENT_HOSTS="a.example,b.example" limits which client_id hosts the teaching server will fetch from.
   const allowList = String(env.ALLOWED_CLIENT_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   let auth;
-  const workspaces = createWorkspaces({ hosted, local: env.WORKSPACE, now, onEvict: (id) => auth.drop(id) });
+  // Run observability (rule 27): the decisions of each run, one stdout line each (logLine), read back by /api/run-observability/:kind.
+  const runs = createRunLog({ now, write: logLine });
+  const workspaces = createWorkspaces({ hosted, local: env.WORKSPACE, now, onEvict: (id) => { auth.drop(id); runs.drop(id); } });
+  // A run is made in the mode the lab is in now. The response carries its id (X-Run-Id), so the page knows an attempt began a run.
+  const beginRun = (req, res, kind) => { workspaces.touch(req.workspaceId); const run = runs.begin(req.workspaceId, kind, source); res.set('X-Run-Id', run.id); return run; };
   // Rule 19: source is 'mock' (the lab's teaching server only, the default) or 'real' (the same lab plus a real
   // PingFederate sign-in for the person at the page). Real needs the PF sign-in client configured.
   const pfConfig = () => {
@@ -111,6 +117,7 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   const realFix = () => `Real mode needs: ${loginProblems(pfConfig()).join('; ')}. Set them in the lab's environment, then restart.`;
   auth = createAuthServer({
     touch: workspaces.touch,
+    onDecision: (req, event) => runs.record(req.workspaceId, req.runId, event),
     allowedHosts: allowList.length ? new Set(allowList) : null,
     issuer: `${origin}/as`,
     // Only the lab's own origin and its /fixtures/ path are opened over http; no other private range or port.
@@ -303,11 +310,18 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   });
   app.get('/api/gateway-sim/mock', (req, res) => res.set('Cache-Control', 'no-store').json(MOCK_TABLE));
   app.post('/api/gateway-sim/evaluate', limit('gateway-sim'), express.json({ limit: '64kb' }), (req, res) => {
+    let run;
     try {
-      res.set('Cache-Control', 'no-store').json(maskDeep(simulate(req.body, { traceId: crypto.randomBytes(16).toString('hex') })));
+      const result = maskDeep(simulate(req.body, { traceId: crypto.randomBytes(16).toString('hex') }));
+      run = beginRun(req, res, 'h2');
+      const { outcome, via, reason, fellBackFrom } = result.summary;
+      runs.record(req.workspaceId, run.id, { step: 'register', outcome: outcome === 'registered' ? 'allowed' : 'refused', check: reason ?? via, via, fellBackFrom, client: result.input?.clientIdUrl, detail: { attempts: result.attempts?.length } });
+      res.set('Cache-Control', 'no-store').json(result);
     } catch (error) {
       if (!(error instanceof SimRefused)) return res.status(500).json({ error: 'server_error' });
       return res.status(400).json({ error: error.code, ...(error.field ? { field: error.field } : {}) });
+    } finally {
+      if (run) runs.end(req.workspaceId, run.id);
     }
   });
 
@@ -315,13 +329,16 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
   app.post('/api/tester/run', limit('tester'), async (req, res) => {
     // The tester calls /as over loopback without a cookie, so it presents a one-run token that maps to this caller's workspace.
     let run;
+    let obsRun;
     try {
-      run = workspaces.grantInternal(req.workspaceId);
+      obsRun = beginRun(req, res, 'tester');
+      run = workspaces.grantInternal(req.workspaceId, obsRun.id);
       res.set('Cache-Control', 'no-store').json(await runServerTests({ asBase: `${origin}/as`, fixtureBase: origin, fetchImpl, headers: { 'x-cimd-internal': run.grant } }));
     } catch {
       res.status(500).json({ error: 'tester_failed' });
     } finally {
       run?.revoke();
+      if (obsRun) runs.end(req.workspaceId, obsRun.id);
     }
   });
 
@@ -355,7 +372,12 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
         if (!pf.ownClientId || !pf.ownRedirectUri) return res.status(409).json({ error: 'own_client_not_configured', detail: 'Set CIMD_CLIENT_ID_URL and CIMD_REDIRECT_URI to a public https address PingFederate can reach' });
         ({ ownClientId: clientId, ownRedirectUri: redirectUri } = pf);
       } else return res.status(400).json({ error: 'unknown_preset' });
-      res.set('Cache-Control', 'no-store').json(await probePf({ base: pf.base, clientId, redirectUri, fetchImpl }));
+      const result = await probePf({ base: pf.base, clientId, redirectUri, fetchImpl });
+      // The run begins with its first event: a probe that never reached PingFederate (refused before the request) leaves the previous record alone.
+      const run = beginRun(req, res, 'probe');
+      runs.record(req.workspaceId, run.id, probeEvent(clientId, result));
+      runs.end(req.workspaceId, run.id);
+      res.set('Cache-Control', 'no-store').json(result);
     } catch (error) {
       res.status(error instanceof PfRefused ? 400 : 500).json({ error: error instanceof PfRefused ? error.message : 'pf_probe_failed' });
     }
@@ -373,10 +395,28 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
     }
   });
 
+  // Run observability (rule 27): the record of the newest finished run of one kind, in the page's current mode. {record, offered, message}.
+  app.get('/api/run-observability/:kind', limit('run-observability', AUTHORIZE_RATE_LIMIT), async (req, res) => {
+    const kind = req.params.kind;
+    if (!KINDS.includes(kind)) return res.status(404).json({ error: 'unknown_kind', message: `No run observability for "${kind.slice(0, 40)}".` });
+    res.set('Cache-Control', 'no-store');
+    if (OFFERED[kind]?.[source]) return res.json({ record: null, offered: false, message: OFFERED[kind][source] });
+    const run = runs.latest(req.workspaceId, kind, source);
+    if (!run) return res.json({ record: null, offered: true, message: NO_RUN[kind] });
+    try {
+      return res.json({ record: await buildRunRecord({ kind, run }), offered: true });
+    } catch (error) {
+      const known = error instanceof RunObsError;
+      console.error('run-observability:', known ? error.code : 'unexpected', known ? error.message : String(error?.message).slice(0, 200));
+      return res.status(known ? error.status : 500).json({ error: known ? error.code : 'run_observability_failed', message: known ? error.message : 'The run record could not be built.' });
+    }
+  });
+
   // State is ephemeral and per workspace: Reset clears only the caller's in-memory pending requests and codes
   // (TTL 60 s codes, 5 min pending). Nothing is persisted.
   app.post('/api/reset', limit('reset', RESET_RATE_LIMIT), (req, res) => {
     auth.reset(req.workspaceId);
+    runs.drop(req.workspaceId);
     res.json({ ok: true });
   });
 

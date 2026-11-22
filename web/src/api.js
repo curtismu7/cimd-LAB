@@ -8,7 +8,8 @@ async function call(method, path, body) {
     });
     let data = null;
     try { data = await response.json(); } catch { /* empty or non-JSON body */ }
-    return { ok: response.ok, status: response.status, data };
+    // X-Run-Id: the run this call began (tester, probe, Live evaluate); absent when the call began none.
+    return { ok: response.ok, status: response.status, data, runId: response.headers?.get?.('x-run-id') ?? null };
   } catch {
     return { ok: false, status: 0, data: { error: 'network_error' } };
   }
@@ -28,6 +29,7 @@ export const api = {
   gatewaySimMock: () => call('GET', '/api/gateway-sim/mock'),
   gatewaySimEvaluate: (input) => call('POST', '/api/gateway-sim/evaluate', input),
   tester: () => call('POST', '/api/tester/run'),
+  runObservability: (kind) => call('GET', `/api/run-observability/${encodeURIComponent(kind)}`),
   stories: () => call('GET', '/api/stories'),
   story: (vertical) => call('GET', `/api/stories/${encodeURIComponent(vertical)}`),
   reset: () => call('POST', '/api/reset'),

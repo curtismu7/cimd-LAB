@@ -130,6 +130,31 @@ docker compose up --build -d
 
 Publishes `127.0.0.1:5250` only (set `PF_BASE_URL` in your shell or a `.env` beside the compose file; it has no default). The image is `node:26-alpine`, non-root, read-only filesystem, all capabilities dropped. `docker-compose.local-pf.yml` points the container at a PingFederate on this machine behind a mkcert certificate (see below).
 
+## What each layer logged for this run (rule 27)
+
+Under the result of three runs the page shows the shared panel "What each layer logged for this run": one run, in time order, over six layers (Person, Agent, Authorize, Privilege, Agent gateway, Resource server), each row with its timestamp and an origin tag. The record comes from `GET /api/run-observability/:kind` (`tester`, `probe`, `h2`) for the page's current mode.
+
+| Run | Where the panel is | Mock | Real |
+|---|---|---|---|
+| Tester (the lab's own authorization server) | Lab as server, under "Tester" | `simulated` rows: the 14 authorize decisions, the consent answer and the two code exchanges, as the lab's server computed them | `response` rows for a run made in Real: the lab's own authorization server's decisions, in this process |
+| Probe (real PingFederate) | PingFederate as server, under "Probe" | not offered (PingFederate is not mocked, and a Mock record cannot hold its reply); the page says so | one `response` row, always information: the HTTP status PingFederate answered and what the lab reads that reply as (PingFederate reports no decision) |
+| Live evaluate (the gateway simulation) | H2 2026, Live, under the result | one `simulated` row: the registration decision | not offered: the engine makes no network call, receives no reply and no product logs it |
+
+- **Origins.** `simulated` = the lab's mock computed it (Mock only). `response` = a reply the lab received (Real only). `logged` = a line read from a product's own log: **this lab reads no product log, so no row is ever `logged`**, there is no Re-read button and no `RUN_OBS_*` setting, and the compose file mounts no Docker socket. A layer with no event of its own reads `not logged` with the reason.
+- **A record belongs to the mode its run was made in.** A run made in Mock is never shown as Real (or the other way round): after switching mode the panel says there is no run in this mode yet until you run again, and switching back shows the earlier run.
+- **Time = when the lab computed it.** Each decision is computed once and stamped once; the stdout line and the row carry that same time. Rows are an excerpt: ids, addresses and host names are masked (a `client_id` URL on a reserved `.example` or `.invalid` host stays readable; another host shows as `<host>` and a loopback address as `<ip>`), so the path and the stage text are what you read.
+- **Lanes are not always the product named on the lane.** The Authorize lane holds the lab's own teaching authorization server's decisions (tester) or PingFederate's answer (probe), never PingOne Authorize. The Agent gateway lane holds the lab's own gateway simulation, never the Ping MCP gateway. A note under each panel says so.
+- **One run per record.** Each run has an id; the tester's loopback calls carry it, so a request made by someone else while the run is going is logged but joins no run. The record is the newest finished run of its kind in the workspace (the newest 3 closed runs of each kind and mode are kept per workspace); Reset clears them.
+- **Where this lab's decisions are logged.** The lab writes ONE stdout line per decision: `<iso time> cimd-lab decision step=<authorize|approve|exchange|probe|register> actor=<client_id, cleaned> result=<passed|stopped|unclear|no-reply> stage=<stage> run=<id>`. Nothing secret is in it (the `client_id` is masked the way the page masks it, then cut to the characters `A-Za-z0-9._:/@-`, so it cannot add a second field or line). Where it can stream: the family collector (`shared/ping-log-collector`) can ship container stdout to `demo-logs-<service>` and on to a SIEM; nothing is set up for this lab by default and this panel does not read that stream back.
+- **PingFederate.** Lives in container stdout (`server.log`, `init.log`); `audit.log` is not on stdout today, so PingFederate's own record of the probe's authorize request is **not logged** and the panel shows only the reply the lab received. PingFederate sign-in events (the Real header sign-in) have no record in this panel: the lab shows the subject and keeps no token.
+
+### Not logged today
+
+- Authorize (PingOne): this lab calls none.
+- PingFederate authorize and sign-in events: `audit.log` is not shipped.
+- Gateway refusal and block lines: line shapes are unconfirmed; the gateway here is a simulation anyway.
+- PingOne sign-in events: they need the PingOne audit reader, which does not exist yet.
+
 ## Tests
 
 ```
@@ -138,7 +163,7 @@ npm test    # server: node --test test/*.test.js; web: vitest run
 
 **Conformance (manual, before a repo or a PR):** `node <demo-kit-base checkout>/scripts/conformance.mjs . --new --tier=Demo` must show 0 FAIL (rule 18 only warns). CI no longer carries a conformance job: it needed a self-hosted checkout of demo-kit-base and was always skipped on GitHub-hosted runners. The hosted copy's history, rollback record and by-content verification are in `docs/hosted-history.md`.
 
-On Node 26: 231 server tests and 81 web tests pass (baseline before the H2 2026 update: 126 and 51). The tests assert literal numbers (limits, counts, boundaries N accepted and N+1 refused). Mutation checks of the H2 2026 engine, masking and request validation were run by hand; none of their scripts is shipped.
+On Node 26: 253 server tests and 208 web tests run (baseline before the run observability panel: 237 and 175). The panel's files are vendored and pinned by `web/src/run-observability/run-observability.sha256`; `scripts/run-observability-checkPin.mjs` checks them and an edited copy fails the tests. The tests assert literal numbers (limits, counts, boundaries N accepted and N+1 refused). Mutation checks of the H2 2026 engine, masking and request validation were run by hand; none of their scripts is shipped.
 
 ## Troubleshooting
 
