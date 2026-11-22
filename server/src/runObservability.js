@@ -47,7 +47,7 @@ export const NAME_OK = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 export const safeName = (n) => typeof n === 'string' && NAME_OK.test(n) && !PROTO.has(n);
 
 // ---- Masker ----------------------------------------------------------------------------------------------
-// Same intent as shared/ping-log-collector/vector.yaml (headers, Bearer/Basic, JWTs, sk- keys, secret-named fields, `code` parameters),
+// Same intent as the log collector's own masking rules (headers, Bearer/Basic, JWTs, sk- keys, secret-named fields, `code` parameters),
 // plus addresses, emails and hostnames. Ids (UUIDs, long hex, long mixed strings) become <id>; only the ids a lab declares in `correlation` are
 // kept, shortened to their first 4 and last 2 characters, so nothing that looks like a secret keeps any of its characters.
 // Every pattern is linear: bounded repetition, no nested quantifier over the same characters, input cut to maxMaskInput first.
@@ -141,8 +141,7 @@ export function createMasker() {
 
 // ---- Line matchers ---------------------------------------------------------------------------------------
 // Table-driven: each entry maps one product's log line to { layer, outcome, message, detail }.
-//   status 'measured'   the line shape was seen on a real run (sources: shared/ping-log-collector, observability-LAB docs and README,
-//                       AI-DEMO2 privilege/GATEWAY-LOGGING-WITH-ELASTICSEARCH.md, all read-only)
+//   status 'measured'   the line shape was seen on a real run (evidence: see the shared README, Evidence section; every source was read-only)
 //   status 'UNVERIFIED' nobody has measured this shape; the rows it makes carry basis 'unverified-shape'. DO NOT promote one without a capture.
 // ANCHORING. A line is either JSON (its FIRST line parses as an object) or text. A JSON line is only ever read through its own fields by a `json`
 // matcher; a text matcher is skipped for it. A text matcher sees only the FIRST line of the entry, and every pattern starts at the beginning with
@@ -182,7 +181,7 @@ const jsonDoc = (v) => v.obj;
 
 export const layerMatchers = [
   {
-    // MEASURED 2026-11-08 (observability-LAB audit-stdout): exactly 14 columns from "tid:" — tid, tracking id, event, subject, ip, (blank),
+    // MEASURED 2026-11-08 (PingFederate audit lines on container stdout, real run): exactly 14 columns from "tid:" — tid, tracking id, event, subject, ip, (blank),
     // client id, protocol, host id, component, status, (blank), description, response ms. Statuses seen: inprogress, failure. 'success' is UNVERIFIED.
     // A value that contains a pipe shifts the columns: the column count is then not 14 and the line is not read at all.
     id: 'pf-audit', product: 'pingfederate', status: 'measured', kind: 'text',
@@ -203,7 +202,7 @@ export const layerMatchers = [
     },
   },
   {
-    // MEASURED 2026-11-08 (observability-LAB p1az-decision): "[P1AZ] DECISION: PERMIT | backend=real | sub=<id> | tool=<name> | method=tools/call | vertical=<v> | obligation=hitl".
+    // MEASURED 2026-11-08 (Authorize decision lines, real run): "[P1AZ] DECISION: PERMIT | backend=real | sub=<id> | tool=<name> | method=tools/call | vertical=<v> | obligation=hitl".
     // Values hold no spaces, so a tool name with " | obligation=hitl" in it makes the whole line unreadable instead of changing its meaning.
     // PERMIT is measured; the wording for any other decision is NOT (DENY is mapped to refused, anything else to info; both UNVERIFIED).
     id: 'p1az-decision', product: 'pinggateway', status: 'measured', kind: 'text',
@@ -229,7 +228,7 @@ export const layerMatchers = [
     },
   },
   {
-    // MEASURED 2026-11-08 (observability-LAB access-audit): one JSON object per request: eventName, response.statusCode (a string), http.request.path.
+    // MEASURED 2026-11-08 (access audit JSON, real run): one JSON object per request: eventName, response.statusCode (a string), http.request.path.
     // The line has no response body, so a 2xx is only `info` (an MCP error can ride in a 200); 401 and 403 are refusals.
     id: 'pinggateway-access', product: 'pinggateway', status: 'measured', kind: 'json',
     match(v) {
@@ -245,7 +244,7 @@ export const layerMatchers = [
     },
   },
   {
-    // MEASURED 2026-11-08 (observability-LAB, topic mcp): client.method (tools/list, tools/call) and client.param (the tool name) on an authenticated call.
+    // MEASURED 2026-11-08 (MCP topic audit JSON, real run): client.method (tools/list, tools/call) and client.param (the tool name) on an authenticated call.
     id: 'pinggateway-mcp', product: 'pinggateway', status: 'measured', kind: 'json',
     match(v) {
       const j = jsonDoc(v);
@@ -253,7 +252,7 @@ export const layerMatchers = [
       return { layer: 'gateway', outcome: 'info', message: `MCP ${j.client.method}${j.client.param ? ` ${j.client.param}` : ''} passed through PingGateway`, detail: nonEmpty({ method: j.client.method, param: j.client.param, clientId: j.client.id }) };
     },
   },
-  // ---- Privilege agent gateway: logfmt lines — MEASURED 2026-11-07/08 (observability-LAB, privilege-logging-test-plan 8a/8c) ----
+  // ---- Privilege agent gateway: logfmt lines — MEASURED 2026-11-07/08 (real runs; see the shared README, Evidence section) ----
   pgw('pgw-token-found', /^Access token found for user: (\S+), client: (\S+)$/, (m) => ({ layer: 'agent', outcome: 'info', message: `The gateway saw an access token for user ${m[1]}, agent client ${m[2]}`, detail: { user: m[1], client: m[2] } })),
   pgw('pgw-policy-denied', /^\[mcpgw\] policy denied (\S+) access to (\w+) app (\S+) \(agent=(\w+)\)(?::.*)?$/, (m) => ({ layer: 'gateway', outcome: 'refused', message: `The gateway refused ${m[1]} access to ${m[2]} app ${m[3]} (policy denied)`, detail: { user: m[1], kind: m[2], app: m[3], agent: m[4] } })),
   pgw('pgw-proxying', /^Proxying to: (\S+)$/, (m) => ({ layer: 'gateway', outcome: 'allowed', message: `The gateway forwarded the call to ${m[1]} (it logs no allow line; forwarding is the evidence)`, detail: { backend: m[1] } })),
@@ -281,7 +280,7 @@ export const layerMatchers = [
   },
   // ---- Privilege SIEM index ping-siem-events-v2 (privilege_event_kind runtime) ----
   {
-    // MEASURED shape (relayed 2026-11-08, never read by observability-LAB itself): Index 'policy-decision-log', Data.Decision allow | deny | hitl.
+    // MEASURED shape (relayed 2026-11-08, never read directly): Index 'policy-decision-log', Data.Decision allow | deny | hitl.
     id: 'siem-policy-decision', product: 'privilege-siem', status: 'measured', kind: 'json',
     match(v) {
       const j = jsonDoc(v);
@@ -323,7 +322,7 @@ export const layerMatchers = [
     match(v) { const m = MCP_HEADER.exec(v.first); return m && m[1] === 'INFO' && MCP_SERVED.test(m[2]) ? { layer: 'resource', outcome: 'allowed', message: `MCP server: ${m[2]}`, detail: { level: m[1] } } : null; },
   },
   {
-    // MEASURED 2026-11-08 (observability-LAB record-header): "[<time>] INFO: token audience validated" — token-validation steps, claim values, never the token.
+    // MEASURED 2026-11-08 (MCP server header lines, real run): "[<time>] INFO: token audience validated" — token-validation steps, claim values, never the token.
     id: 'mcp-server-validation', product: 'mcp-server', status: 'measured', kind: 'text',
     match(v) { const m = MCP_HEADER.exec(v.first); return m && MCP_VALIDATION.test(m[2]) ? { layer: 'resource', outcome: 'info', message: `MCP server: ${m[2]}`, detail: { level: m[1] } } : null; },
   },
