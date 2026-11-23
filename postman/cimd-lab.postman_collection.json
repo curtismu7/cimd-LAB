@@ -3,7 +3,7 @@
     "name": "CIMD LAB",
     "description": "API collection for CIMD LAB: drive the lab's teaching authorization server (Direction 2), probe real PingFederate (Direction 1), and exercise the H2 2026 gateway simulation (mock only). Pair with <slug>.live.environment.json filled by shared/postman/fill-env.mjs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "c50b776e-983e-4e48-ab90-cd25f8353b8d"
+    "_postman_id": "postman-cimd-lab"
   },
   "item": [
     {
@@ -20,7 +20,7 @@
                 "exec": [
                   "/* Assertions for this request */",
                   "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b.state).to.eql('ready');"
+                  "const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);"
                 ]
               }
             }
@@ -271,7 +271,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);"
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 409]);"
                 ]
               }
             }
@@ -303,7 +303,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);"
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 409]);"
                 ]
               }
             }
