@@ -5,5 +5,6 @@ import './top-menu/top-menu.css';
 import './components/JsonPane.css';
 import './components/VerifyMark.css';
 import './app.css';
+import './story/story.css';
 
 createRoot(document.getElementById('root')).render(<App />);

@@ -22,7 +22,15 @@ export default function LabView({ resetKey, source }) {
   const [run, setRun] = useState(null);
   const [busy, setBusy] = useState(false);
   const [runKey, setRunKey] = useState(); // undefined: nothing tried yet; null: the last attempt began no run; else the id of the run it began
-  const start = async () => { setBusy(true); const r = await api.tester(); setRun(r); setBusy(false); setRunKey(r.runId); };
+  const start = async () => {
+    setBusy(true);
+    try { window.dispatchEvent(new CustomEvent('cimd:run-start')); } catch { /* no window events */ }
+    const r = await api.tester();
+    try { window.dispatchEvent(new CustomEvent('cimd:run-end', { detail: { ok: r.ok !== false } })); } catch { /* no window events */ }
+    setRun(r);
+    setBusy(false);
+    setRunKey(r.runId);
+  };
   const data = run?.data;
   return (
     <div className="view" key={resetKey}>
