@@ -61,9 +61,17 @@ export function createHost({ win = window, doc = document, settleMs = 400 } = {}
       });
     },
     prefill() { /* no free-text question in this lab: a prompt step points at the page's own button */ },
-    send(step) {
-      if (step.press && step.press.selector) { click(q(step.press.selector)); return; }
-      throw new Error('the step has no button to press');
+    async send(step) {
+      const press = step.prompt?.press ?? step.press;
+      if (!press || !press.selector && !press) throw new Error('the step has no button to press');
+      const sel = typeof press === 'string' ? press : press.selector;
+      // The page may still be rendering the panel that holds the button (a tab or mode switch): give it a moment.
+      for (let i = 0; ; i += 1) {
+        const el = q(sel);
+        if (el && !el.disabled) { el.click(); return; }
+        if (i >= 20) throw new Error('the button is not available');
+        await sleep(100);
+      }
     },
     switchTab(tab) {
       const el = q(`button#tab-${tab}`);
@@ -108,16 +116,18 @@ const Befores = {
 
 export const NOT_YET = [];
 
-/** The script as engine steps. `captions` is /api/story. */
-export function buildSteps({ captions, host, doc = document, win = window, script = STEPS, notYet = NOT_YET }) {
-  let tab;   // a step with no tab of its own belongs to the last tab named before it, so Back always shows the right panel
-  return script.filter((s) => !notYet.includes(s.key)).map((s) => {
-    if (s.tab) tab = s.tab;
-    const step = { key: s.key, type: s.type, trigger: s.trigger, modes: s.modes, sampleKey: s.sampleKey, prefer: s.prefer, place: s.place, fixedSecs: s.fixedSecs, frameTimeoutMs: s.frameTimeoutMs, tab };
-    if (s.press) step.prompt = { press: s.press.selector };
-    if (s.askLine) step.lines = () => [s.askLine];
-    if (s.before && Befores[s.before]) step.before = () => Befores[s.before](doc, host);
-    if (s.type === 'bubble') step.target = targetFor(doc, s.target, host);
-    return step;
-  });
-}
+  /** The script as engine steps. `captions` is /api/story. */
+  export function buildSteps({ captions, host, doc = document, win = window, script = STEPS, notYet = NOT_YET }) {
+    let tab;   // a step with no tab of its own belongs to the last tab named before it, so Back always shows the right panel
+    return script.filter((s) => !notYet.includes(s.key)).map((s) => {
+      if (s.tab) tab = s.tab;
+      const step = { key: s.key, type: s.type, trigger: s.trigger, modes: s.modes, sampleKey: s.sampleKey, prefer: s.prefer, place: s.place, fixedSecs: s.fixedSecs, frameTimeoutMs: s.frameTimeoutMs, tab };
+      if (s.press) step.prompt = { press: s.press.selector };
+      if (s.askLine) step.lines = () => [s.askLine];
+      // React renders the tab's panel after host.switchTab returns: give it a moment before the target is looked for.
+      const named = s.before && Befores[s.before];
+      step.before = async () => { await host._sleep(host._settleMs); if (named) await named(doc, host); };
+      if (s.type === 'bubble') step.target = targetFor(doc, s.target, host);
+      return step;
+    });
+  }

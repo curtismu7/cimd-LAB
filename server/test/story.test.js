@@ -46,7 +46,7 @@ test('story: the wording is public-safe (no internal hostnames, ids, keys or pat
 
 test('story: the script is in walk order and every prompt step names its button', () => {
   const prompts = STEPS.filter((s) => s.press);
-  assert.deepEqual(prompts.map((s) => s.key), ['learn_validate_prompt', 'h2_prompt', 'lab_prompt']);
+  assert.deepEqual(prompts.map((s) => s.key), ['h2_prompt', 'lab_prompt']);
   for (const s of prompts) assert.ok(s.press.selector, `${s.key} has a press selector`);
 });
 

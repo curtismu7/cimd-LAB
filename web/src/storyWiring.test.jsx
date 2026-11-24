@@ -86,16 +86,29 @@ describe('story host', () => {
     const host = createHost();
     const clicked = vi.fn();
     document.querySelector('.go').addEventListener('click', clicked);
-    host.send({ press: { selector: '.go' } });
+    await host.send({ press: { selector: '.go' } });
     expect(clicked).toHaveBeenCalledTimes(1);
     host.dispose();
   });
 
-  it('send refuses when the button is missing or disabled', () => {
+  it('send waits for a button that is still rendering, then presses it', async () => {
+    document.body.innerHTML = '';
+    const host = createHost();
+    const clicked = vi.fn();
+    setTimeout(() => {
+      document.body.innerHTML = '<button type="button" class="late">Go</button>';
+      document.querySelector('.late').addEventListener('click', clicked);
+    }, 400);
+    await host.send({ press: { selector: '.late' } });
+    expect(clicked).toHaveBeenCalledTimes(1);
+    host.dispose();
+  });
+
+  it('send refuses when the button never appears', async () => {
     document.body.innerHTML = '<button type="button" class="go" disabled>Run the tester</button>';
     const host = createHost();
-    expect(() => host.send({ press: { selector: '.go' } })).toThrow(/not available/);
-    expect(() => host.send({})).toThrow(/no button/);
+    await expect(host.send({ press: { selector: '.go' } })).rejects.toThrow(/not available/);
+    await expect(host.send({})).rejects.toThrow(/no button/);
     host.dispose();
   });
 
@@ -138,13 +151,12 @@ describe('story steps', () => {
     host.dispose();
   });
 
-  it('the pf_intro bubble is hidden while PingFederate is not configured', () => {
+  it('the pf_intro bubble points at the conformance card, which is always on the tab', () => {
     const host = createHost();
     const steps = buildSteps({ captions: {}, host });
     const pf = steps.find((s) => s.key === 'pf_intro');
-    document.body.innerHTML = '<div class="view"><h2>PingFederate as the authorization server</h2><p data-testid="pf-not-configured">PingFederate is not configured</p></div>';
     expect(pf.target()).toBeNull();
-    document.querySelector('[data-testid=pf-not-configured]').remove();
+    document.body.innerHTML = '<section data-testid="pf-conformance"><h3>Conformance run</h3></section>';
     expect(pf.target()).not.toBeNull();
     host.dispose();
   });

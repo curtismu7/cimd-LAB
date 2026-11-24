@@ -15,24 +15,23 @@ export const STEPS = [
   { key: 'h2_note', type: 'slide', trigger: 'load', tab: 'h2' },
   { key: 'opening', type: 'slide', trigger: 'load', tab: 'learn' },
 
-  // ---- the Learn tab: what CIMD is, and the local validator
-  { key: 'learn_intro', type: 'bubble', tab: 'learn', trigger: 'load', target: { id: 'tabpanel' }, prefer: 'right' },
-  { key: 'learn_validate_prompt', type: 'bubble', tab: 'learn', trigger: 'load', target: '#doc-text', prefer: 'above', press: { selector: '#doc-text ~ button, section button[type=button]' }, askLine: 'asks: validate the sample document' },
-  { key: 'learn_validate_done', type: 'bubble', tab: 'learn', trigger: 'run-done', target: { selector: '[data-testid=validate-result]' }, prefer: 'right' },
+  // ---- the Learn tab: what CIMD is, and the registration-cost illustration (a diagram, not a run: no run events fire here)
+  { key: 'learn_intro', type: 'bubble', tab: 'learn', trigger: 'load', target: { selector: '.view h2[data-n="1"]' }, prefer: 'right' },
+  { key: 'learn_math', type: 'bubble', tab: 'learn', trigger: 'load', target: '[data-testid=registration-math]', prefer: 'above' },
 
   // ---- the H2 2026 tab: the simulation, its tags, one run
   { key: 'h2_intro', type: 'bubble', tab: 'h2', trigger: 'load', target: '[data-testid=h2-banner]', prefer: 'below' },
-  { key: 'h2_claims', type: 'bubble', tab: 'h2', trigger: 'load', target: '[data-testid=claims-table]', prefer: 'below' },
+  { key: 'h2_claims', type: 'bubble', tab: 'h2', trigger: 'load', target: { selector: '#h2-claims' }, prefer: 'below' },
   { key: 'h2_prompt', type: 'bubble', tab: 'h2', trigger: 'load', target: '[data-testid=mode-banner]', prefer: 'above', before: 'liveMode', press: { selector: '.h2 .sim-form button[type=submit]' }, askLine: 'asks: press Evaluate' },
-  { key: 'h2_done', type: 'bubble', tab: 'h2', trigger: 'run-done', target: { selector: '[data-testid=sim-result]' }, prefer: 'below' },
+  { key: 'h2_done', type: 'bubble', tab: 'h2', trigger: 'run-done', target: { selector: '.sim-result__headline' }, prefer: 'below' },
 
   // ---- the Lab as server tab: the teaching server meets the tester
-  { key: 'lab_intro', type: 'bubble', tab: 'lab', trigger: 'load', target: '.view h2', prefer: 'below' },
-  { key: 'lab_prompt', type: 'bubble', tab: 'lab', trigger: 'load', target: '.view .card .primary', prefer: 'above', press: { selector: '.view .card button.primary' }, askLine: 'asks: press "Run the tester"' },
+  { key: 'lab_intro', type: 'bubble', tab: 'lab', trigger: 'load', target: { selector: '.view h2' }, prefer: 'below' },
+  { key: 'lab_prompt', type: 'bubble', tab: 'lab', trigger: 'load', target: { selector: '.view h2' }, prefer: 'above', press: { selector: '.view .card button.primary' }, askLine: 'asks: press "Run the tester"' },
   { key: 'lab_done', type: 'bubble', tab: 'lab', trigger: 'run-done', target: { selector: '[data-testid=summary]' }, prefer: 'below' },
 
-  // ---- the PingFederate tab: only worth showing when direction 1 is configured; skipped honestly otherwise
-  { key: 'pf_intro', type: 'bubble', tab: 'pf', trigger: 'load', target: { selector: '.view h2', check: 'pfConfigured' }, prefer: 'below' },
+  // ---- the PingFederate tab: the local document validator (works offline); the owner adds a real PF later
+  { key: 'pf_intro', type: 'bubble', tab: 'pf', trigger: 'load', target: { selector: '[data-testid=pf-conformance]' }, prefer: 'above' },
 
   // ---- the end
   { key: 'closing', type: 'slide', trigger: 'load', tab: 'learn' },

@@ -100,25 +100,13 @@ A client identifies itself with a URL to a JSON metadata document. The server fe
 
 ---
 
-# Step: learn_validate_prompt
+# Step: learn_math
 
 ## Title
-Paste a document
+See the cost of registration
 
 ## Text
-This tab checks a document against the lab's rules without fetching anything. Press Validate to check the sample document the box already holds.
-
-## Verdict
-
----
-
-# Step: learn_validate_done
-
-## Title
-What the validator said
-
-## Text
-The document passes or fails with the rule named for each finding. Nothing was fetched and no server was contacted: the check is local.
+The lab counts what registration costs beside the flow: with DCR, every fresh connection leaves a stored record on the server, to be found and cleaned up later. With CIMD, no per-client record exists: the client's identity is the address of a document it already owns.
 
 ---
 
@@ -195,10 +183,10 @@ Each case shows what the server expected, what it answered, and the request and 
 # Step: pf_intro
 
 ## Title
-Real PingFederate, only when configured
+Paste a document, check the rules
 
 ## Text
-Direction 1 talks to real PingFederate, owner-run. Not configured, the lab makes no request at all and this tab says PingFederate is not configured. Nothing here was measured on a tenant.
+This tab also holds the lab's document validator: it checks a pasted document against the lab's rules without fetching anything or contacting any server. Direction 1 itself talks to real PingFederate, owner-run; not configured, the lab makes no request at all. Nothing here was measured on a tenant.
 
 ---
 
