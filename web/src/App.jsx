@@ -169,6 +169,7 @@ export default function App() {
         <span className="shell-right">
           <span className="mode-toggle" style={{ display: "contents" }}>
             <TopMenu
+          postman={{ repo: "curtismu7/cimd-lab", slug: "cimd-lab" }}
             mode={info && !hosted && tab !== 'h2' ? { value: info.source === 'real' ? 'real' : 'mock', onChange: changeMode, realAvailable: info.realAvailable !== false } : undefined}
             theme={{ value: theme, onChange: setTheme }}
             fontSize={{ value: fontStep, onChange: setFontStep }}

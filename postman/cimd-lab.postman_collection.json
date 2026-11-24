@@ -18,9 +18,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);"
+                  "pm.test(\"Health\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);",
+                  "});"
                 ]
               }
             }
@@ -50,8 +51,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);"
+                  "pm.test(\"Info\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
                 ]
               }
             }
@@ -87,9 +89,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b.client_id).to.be.a('string');"
+                  "pm.test(\"Fetch the good fixture document\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b.client_id).to.be.a('string');",
+                  "});"
                 ]
               }
             }
@@ -119,9 +122,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b.client_id).to.be.a('string');"
+                  "pm.test(\"Fetch the client_id-mismatch fixture (negative)\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b.client_id).to.be.a('string');",
+                  "});"
                 ]
               }
             }
@@ -151,8 +155,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.eql(404);"
+                  "pm.test(\"Fetch an unknown fixture (negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.eql(404);",
+                  "});"
                 ]
               }
             }
@@ -182,9 +187,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json()).to.have.property('valid');"
+                  "pm.test(\"Validate a pasted document\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('valid');",
+                  "});"
                 ]
               }
             }
@@ -223,9 +229,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().valid).to.eql(false);"
+                  "pm.test(\"Validate an invalid document (negative)\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().valid).to.eql(false);",
+                  "});"
                 ]
               }
             }
@@ -270,8 +277,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 409]);"
+                  "pm.test(\"PF discovery status\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
+                  "});"
                 ]
               }
             }
@@ -302,8 +310,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 409]);"
+                  "pm.test(\"Probe PF with client.dev preset\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
+                  "});"
                 ]
               }
             }
@@ -343,8 +352,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([400, 409]);"
+                  "pm.test(\"Probe PF without confirm (negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([400, 409]);",
+                  "});"
                 ]
               }
             }
@@ -390,9 +400,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json()).to.have.property('banner');"
+                  "pm.test(\"Simulation info\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('banner');",
+                  "});"
                 ]
               }
             }
@@ -423,8 +434,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);"
+                  "pm.test(\"Mock table\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
                 ]
               }
             }
@@ -455,8 +467,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);"
+                  "pm.test(\"Evaluate a CIMD-preferring registration\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
                 ]
               }
             }
@@ -496,9 +509,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.eql(400);",
-                  "pm.expect(pm.response.json()).to.have.property('error');"
+                  "pm.test(\"Evaluate with a missing field (negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "  pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
                 ]
               }
             }
