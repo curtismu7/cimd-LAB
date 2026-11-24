@@ -56,6 +56,7 @@ export default function StoryRoot({ onExit, prefix = "cimd" }) {
     return (
       <div className="story-bar" role="alert" data-testid="story-error">
         <span className="story-msg">Story could not start: {error}</span>
+        {/* ui-pattern: allow P9 Story error-fallback chrome: the Exit button is the only escape from a failed Story, never a page primary (shared/story run, owner 2026-11-24) */}
         <button type="button" onClick={onExit}>Exit</button>
       </div>
     );
