@@ -178,8 +178,10 @@ export default function App() {
     <div className={`app${presenter ? ' presenter' : ''}`}>
       <header className="shell-bar">
         <span className="shell-brand">
-          <span className="shell-logo" aria-hidden="true">P</span>
-          <h1>{customer.name}</h1>
+          <span className="brand-mark" aria-hidden="true">P</span>
+          <span className="shell-brand__text">
+            <h1 className="shell-brand__name">{customer.name}</h1>
+          </span>
         </span>
         <span className="shell-right">
           <span className="mode-toggle" style={{ display: "contents" }}>
