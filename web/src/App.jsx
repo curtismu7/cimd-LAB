@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { api } from './api.js';
 import TopMenu, { applyFontSize } from './top-menu/TopMenu.jsx';
 import ModeToggle from './ModeToggle.jsx';
+import StoryToggle, { storyKey } from './story/StoryToggle.jsx';
+import { StoryBoundary } from './StoryBoundary.jsx';
+
+// Story mode is loaded only when the viewer switches it on, so the page in Demo mode does not pay for it.
+const StoryRoot = lazy(() => import('./StoryRoot.jsx'));
+export const STORY_PREFIX = 'cimd';
 import Learn from './views/Learn.jsx';
 import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
@@ -50,6 +56,8 @@ export default function App() {
   const [customer, setCustomer] = useState({ name: 'CIMD Lab', tagline: '' });
   const [vertical, setVertical] = useState(null);
   const [talkOpen, setTalkOpen] = useState(false);
+  const [storyOn, setStoryOn] = useState(false);
+  const [toggleKey, setToggleKey] = useState(0);
   const { story: talkStory } = useStory(vertical);
   const talkSteps = (() => {
     if (!talkStory) return [];
@@ -111,6 +119,13 @@ export default function App() {
     const r = await api.reset();
     setResetKey((k) => k + 1);
     setResetNote(r.ok ? 'Reset: server state cleared and diagram positions restored.' : 'Diagram positions restored; the server reset call failed.');
+    try { window.dispatchEvent(new CustomEvent('cimd:reset')); } catch { /* no window events */ }
+  };
+  // Exit in the Story bar: back to Demo, remembered, and ?story=1 dropped from the address so a reload stays in Demo.
+  const leaveStory = () => {
+    writeStored(storyKey(STORY_PREFIX), 'demo');
+    try { const u = new URL(window.location.href); if (u.searchParams.has('story')) { u.searchParams.delete('story'); window.history.replaceState(null, '', u); } } catch { /* no address to tidy */ }
+    setToggleKey((k) => k + 1);
   };
   // ARIA tab pattern: one tab in the tab order, arrows/Home/End move focus and select.
   const onTabKeyDown = (event) => {
@@ -178,7 +193,7 @@ export default function App() {
             help={{ href: 'https://github.com/curtismu7/cimd-LAB#readme' }}
             version={config?.version || null}
             onReset={!presenter ? reset : undefined}
-            extra={!presenter ? <ReturnLink app="cimd" variant="header" /> : undefined}
+            extra={!presenter ? <><StoryToggle key={toggleKey} prefix={STORY_PREFIX} onChange={setStoryOn} /><ReturnLink app="cimd" variant="header" /></> : undefined}
           >
             {!presenter && <ShelfLink />}
             {!presenter && <VerifyMark id="cimd-lab" />}
@@ -213,6 +228,13 @@ export default function App() {
         </main>
       </div>
       <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={talkSteps} />
+      {storyOn && !presenter ? (
+        <StoryBoundary onExit={leaveStory}>
+          <Suspense fallback={null}>
+            <StoryRoot onExit={leaveStory} prefix={STORY_PREFIX} />
+          </Suspense>
+        </StoryBoundary>
+      ) : null}
     </div>
   );
 }

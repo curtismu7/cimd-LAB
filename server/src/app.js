@@ -18,6 +18,7 @@ import { MOCK_TABLE } from './gateway-sim-table.js';
 import { maskDeep } from './mask.js';
 import { shelfInfo } from './shelfLink.js';
 import { RunObsError } from './runObservability.js';
+import { storyResponse } from './storyRoute.js';
 import { createRunLog, buildRunRecord, probeEvent, KINDS, OFFERED, NO_RUN } from './runLog.js';
 
 const DEMO = { id: 'cimd-lab', name: 'CIMD Lab', version: '0.1.0' };
@@ -57,7 +58,7 @@ function createRateLimiter({ now, hosted }) {
 const GET = ['GET', 'HEAD'];
 const POST = ['POST'];
 const ROUTE_METHODS = new Map([
-  ['/api/health', GET], ['/api/config', GET], ['/api/stories', GET], ['/api/validate', POST], ['/api/tester/run', POST],
+  ['/api/health', GET], ['/api/config', GET], ['/api/stories', GET], ['/api/story', GET], ['/api/validate', POST], ['/api/tester/run', POST],
   ['/api/pf/status', GET], ['/api/pf/probe', POST], ['/api/pf/conformance', POST], ['/api/reset', POST], ['/api/gateway-sim/info', GET], ['/api/gateway-sim/mock', GET],
   ['/api/gateway-sim/evaluate', POST], ['/client.json', GET], ['/client-dev-local.json', GET], ['/callback', GET], ['/as/authorize', GET], ['/as/approve', POST], ['/as/token', POST],
   ['/as/.well-known/oauth-authorization-server', GET],
@@ -422,6 +423,9 @@ export function createApp({ port, env = process.env, fetchImpl = fetch, webDist 
 
   // The header "Shelf" button. Outside the web-build check below (it was unreachable without a build).
   app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo(env)); });
+
+  // Story mode wording (shared/story/README.md): parsed once per file change; a wording problem is a 500 that names it and never a server path.
+  app.get('/api/story', (_req, res) => { const r = storyResponse(); res.status(r.status).json(r.body); });
 
   // The built web UI, when it exists. Registered last so it never shadows an API route.
   if (fs.existsSync(path.join(webDist, 'index.html'))) {

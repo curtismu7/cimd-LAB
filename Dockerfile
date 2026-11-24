@@ -16,6 +16,8 @@ COPY web/package.json web/
 RUN npm ci --omit=dev --ignore-scripts -w server
 COPY server/src server/src
 COPY stories stories
+# The Story wording (GET /api/story) is read from story/captions.md at run time; nothing else of story/ is needed in the image.
+COPY story/captions.md story/captions.md
 COPY customer.config.json ./
 COPY --from=build /app/web/dist web/dist
 # Writes nothing: runs with a read-only root filesystem. No secrets are baked in; PF_BASE_URL etc. come from the environment.

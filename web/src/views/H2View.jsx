@@ -68,7 +68,9 @@ function H2Body({ resetKey, presenter, source }) {
   const evaluate = async () => {
     const mine = ++seq.current;
     setBusy(true);
+    try { window.dispatchEvent(new CustomEvent('cimd:run-start')); } catch { /* no window events */ }
     const r = await api.gatewaySimEvaluate(fromForm(form));
+    try { window.dispatchEvent(new CustomEvent('cimd:run-end', { detail: { ok: r.ok !== false } })); } catch { /* no window events */ }
     if (mine !== seq.current) return; // a newer run owns the screen
     setRunKey(r.runId);
     setRun(r);

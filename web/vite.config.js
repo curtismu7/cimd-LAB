@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // The Story wording tests read the vendored parser and the wording file from the repo root (outside web/).
+  server: { fs: { allow: ['..'] } },
   server: {
     host: '127.0.0.1',
     port: 5251,
