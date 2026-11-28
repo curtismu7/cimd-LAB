@@ -60,7 +60,7 @@ The H2 2026 tab simulates a claim from Ping's deck: an MCP gateway that prefers 
 - Nothing leaves this machine
 
 ## Verdict
-The banner on every tab says it: Ping release claim, UNVERIFIED on our tenant.
+The banner on this tab says it: Ping release claim, UNVERIFIED on our tenant.
 
 ---
 

@@ -11,7 +11,7 @@ export const HELP_SECTIONS = [
     heading: "Measured vs simulated vs UNVERIFIED",
     body: [
       "MEASURED (2026-11-05, local PingFederate 13.1): PingFederate cannot act as a CIMD client — its OIDC IdP connection offers only client_secret_basic, client_secret_post, private_key_jwt and client_secret_jwt, no `none`, so a remote server cannot treat it as one. This lab does not claim it.",
-      "REAL: direction 1's server side is real PingFederate. SIMULATED: direction 2's server, and the whole H2 2026 tab, which simulates a claim from Ping's deck (release dated 2026-11-02). UNVERIFIED: every product claim on the H2 2026 tab — it never ran on our tenant, and it is not PingFederate and not the Ping gateway. The banner on every tab says so."
+      "REAL: direction 1's server side is real PingFederate. SIMULATED: direction 2's server, and the whole H2 2026 tab, which simulates a claim from Ping's deck (release dated 2026-11-02). UNVERIFIED: every product claim on the H2 2026 tab — it never ran on our tenant, and it is not PingFederate and not the Ping gateway. The MOCK or REAL modal the page opens on says so, and the H2 2026 tab carries its own banner."
     ]
   },
   {
@@ -24,10 +24,10 @@ export const HELP_SECTIONS = [
   },
   {
     heading: "Mode honesty",
-    body: "The mode line under the banner changes with the tab: on the PingFederate tab it reads 'Mode: real PingFederate (direction 1) and the lab's teaching server (direction 2)'; on the H2 2026 tab it reads 'Mode: local simulation of a Ping release claim (Mock or Live, chosen on this tab); not PingFederate, not the Ping gateway'. Nothing on any tab leaves your machine except direction 1's calls to the PingFederate the owner configured."
+    body: "The mode line at the top of the page changes with the tab: on the PingFederate tab it reads 'Mode: real PingFederate (direction 1) and the lab's teaching server (direction 2)'; on the H2 2026 tab it reads 'Mode: local simulation of a Ping release claim (Mock or Live, chosen on this tab); not PingFederate, not the Ping gateway'. Nothing on any tab leaves your machine except direction 1's calls to the PingFederate the owner configured."
   },
   {
     heading: "State, and Reset",
-    body: "State is per visitor and ephemeral: lost on restart. Reset clears server state for your workspace and restores diagram positions. The hosted copy behaves the same and says so in its banner."
+    body: "State is per visitor and ephemeral: lost on restart. Reset clears server state for your workspace and restores diagram positions. The hosted copy behaves the same and says so in the modal the page opens on."
   }
 ];

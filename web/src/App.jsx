@@ -22,6 +22,7 @@ import ShelfLink from "./components/ShelfLink.jsx";
 import VerifyMark from "./components/VerifyMark.jsx";
 // Opened from Customer Agent LAB (UC43 routes here): strip + header Back only; no tab or vertical is preselected.
 import ReturnLink from "./return-link/ReturnLink.jsx";
+import ModeModal from "./mode-modal/ModeModal.jsx";
 
 export const TABS = [
   { id: 'learn', label: 'Learn', View: Learn },
@@ -32,14 +33,17 @@ export const TABS = [
   { id: 'talk', label: 'Talk track', View: TalkTrack },
 ];
 
-export const BANNER = 'PingFederate parts use real PingFederate. The lab\'s own server is a teaching server, not a product. Tests with canned PingFederate replies prove nothing about PingFederate.';
-
-export const RELEASE_BANNER = 'Ping release claim, UNVERIFIED on our tenant: the H2 2026 tab simulates a claim from Ping\'s deck (release dated 2026-11-02). It is a local simulation, not PingFederate and not the Ping gateway.';
+// The Real-or-mock modal (shared mode-modal) replaces the old banner paragraph. This lab is mixed on purpose: direction 1 is always real PingFederate, direction 2 is the
+// teaching server, the H2 2026 tab is a local simulation of a Ping release claim, so the lines say what is real, what is simulated and what is UNVERIFIED. Real (the
+// Mock | Real switch) adds a PingFederate sign-in for the person at the page; the hosted copy stays in mock. The per-tab "Mode:" line and the H2 tab's own release banner stay.
+export const MODE_LINES = {
+  mock: 'PingFederate parts use real PingFederate; the lab\'s own server is a teaching server, not a product. The H2 2026 tab is a local simulation of a Ping release claim, UNVERIFIED on our tenant. Tests with canned PingFederate replies prove nothing about PingFederate.',
+  real: 'Real adds a PingFederate sign-in (pi.flow) for you, run server-side against your PingFederate; the lab keeps no token. The lab\'s own server is still a teaching server, the H2 2026 tab is still a local simulation (UNVERIFIED on our tenant), and canned-reply tests prove nothing about PingFederate.',
+  hosted: 'Hosted copy: direction 2 is simulated by the lab\'s teaching server; direction 1 uses real PingFederate. State here is ephemeral, lost on restart, and kept per visitor: Reset clears only yours. The H2 2026 tab is a local simulation of a Ping release claim, UNVERIFIED on our tenant.',
+};
 
 export const MODE_PF = 'Mode: real PingFederate (direction 1) and the lab\'s teaching server (direction 2)';
 export const MODE_H2 = 'Mode: local simulation of a Ping release claim (Mock or Live, chosen on this tab); not PingFederate, not the Ping gateway';
-
-export const HOSTED_BANNER = 'Hosted copy: direction 2 is simulated by the lab\'s teaching server; direction 1 uses real PingFederate. State here is ephemeral, lost on restart, and kept per visitor: Reset clears only yours.';
 
 function readStored(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStored(key, value) { try { localStorage.setItem(key, value); } catch { /* storage may be blocked */ } }
@@ -220,7 +224,6 @@ export default function App() {
         )}
       </header>
       <div className="page">
-        <div className="banner" role="note">{hosted ? `${HOSTED_BANNER} ` : ''}{BANNER} {RELEASE_BANNER}</div>
         <ReturnLink app="cimd" />
         <p className="mode" data-testid="mode">{tab === 'h2' ? MODE_H2 : MODE_PF}</p>
         {customer.tagline ? <p className="tagline">{customer.tagline}</p> : null}
@@ -232,6 +235,7 @@ export default function App() {
           <Active resetKey={resetKey} presenter={presenter} vertical={vertical} setVertical={setVertical} source={info?.source} />
         </main>
       </div>
+      <ModeModal mode={info?.source === 'real' ? 'real' : 'mock'} lines={{ ...MODE_LINES, mock: hosted ? MODE_LINES.hosted : MODE_LINES.mock }} suppress={storyOn} storageKey="cimd-mode" />
       <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={talkSteps} />
       <HelpDialog isOpen={helpOpen} onClose={() => setHelpOpen(false)} sections={HELP_SECTIONS} docsUrl='https://github.com/curtismu7/cimd-LAB#readme' />
       {storyOn && !presenter ? (

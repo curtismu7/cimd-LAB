@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App, { BANNER, HOSTED_BANNER } from './App.jsx';
+import App, { MODE_LINES } from './App.jsx';
 import Verdict, { VERDICTS } from './Verdict.jsx';
 import PfView from './views/PfView.jsx';
 import LabView from './views/LabView.jsx';
@@ -24,13 +24,13 @@ describe('presenter mode keys', () => {
   const press = (key, init = {}, target = document.body) => act(() => { target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })); });
   const presenting = () => screen.getByTestId('presenter').getAttribute('aria-pressed') === 'true';
 
-  it('P toggles presenter mode (either case), Esc leaves it, and the banner stays', async () => {
+  it('P toggles presenter mode (either case), Esc leaves it, and there is still no banner', async () => {
     render(<App />);
     await screen.findByRole('heading', { name: 'What CIMD is' });
     expect(presenting()).toBe(false);
     press('p');
     expect(presenting()).toBe(true);
-    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
+    expect(document.querySelector('.page > .banner')).toBeNull();
     press('Escape');
     expect(presenting()).toBe(false);
     press('P', { shiftKey: true });
@@ -80,10 +80,14 @@ describe('presenter mode keys', () => {
 });
 
 describe('tabs and cross-cutting chrome', () => {
-  it('shows the banner and switches tabs, also in presenter mode', async () => {
+  it('opens on the MOCK modal, has no banner, and switches tabs, also in presenter mode', async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByRole('note')).toHaveTextContent(BANNER);
+    const modal = await screen.findByTestId('mode-modal');
+    expect(modal).toHaveAttribute('data-mode', 'mock');
+    expect(modal).toHaveTextContent('MOCK');
+    expect(modal).toHaveTextContent(MODE_LINES.mock);
+    expect(document.querySelector('.page > .banner')).toBeNull();
     expect(await screen.findByRole('heading', { name: 'What CIMD is' })).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'PingFederate as server' }));
     expect(await screen.findByRole('heading', { name: /PingFederate as the authorization server/ })).toBeInTheDocument();
@@ -92,7 +96,7 @@ describe('tabs and cross-cutting chrome', () => {
     await user.click(screen.getByRole('tab', { name: 'Talk track' }));
     expect(await screen.findByRole('heading', { name: /talk track/i })).toBeInTheDocument();
     await user.click(screen.getByTestId('presenter'));
-    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
+    expect(document.querySelector('.page > .banner')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull();
     expect(screen.getByTestId('mode')).toBeInTheDocument();
   });
@@ -162,28 +166,98 @@ describe('tablist follows the ARIA tab pattern', () => {
   });
 });
 
-describe('hosted banner variant', () => {
-  const configAs = (mode) => vi.stubGlobal('fetch', vi.fn(async (url) => (url === '/api/config' ? json({ mode, publicHost: 'cimd-lab.example', pfBase: 'https://pf.example:9031' }) : json({ ok: true }))));
+describe('Real-or-mock modal states (it replaced the banner)', () => {
+  const configAs = (mode, info = { source: 'mock', realAvailable: true }) => vi.stubGlobal('fetch', vi.fn(async (url) => {
+    if (url === '/api/config') return json({ mode, publicHost: 'cimd-lab.example', pfBase: 'https://pf.example:9031' });
+    if (url === '/api/info') return json(info);
+    return json({ ok: true });
+  }));
 
-  it('shows the hosted text in addition to the usual banner, also in presenter mode', async () => {
-    configAs('hosted');
-    const user = userEvent.setup();
-    render(<App />);
-    expect(await screen.findByText(new RegExp('^Hosted copy: direction 2 is simulated'))).toHaveTextContent(BANNER);
-    expect(HOSTED_BANNER).toContain('direction 1 uses real PingFederate');
-    await user.click(screen.getByTestId('presenter'));
-    expect(screen.getByRole('note')).toHaveTextContent(HOSTED_BANNER);
-    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
-  });
-
-  it('does not show it for a local copy', async () => {
+  it('local mock: says what is real PingFederate, what is the teaching server, and that the H2 tab is UNVERIFIED', async () => {
     configAs('local');
     render(<App />);
-    await screen.findByRole('note');
+    const modal = await screen.findByTestId('mode-modal');
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/config', expect.anything()));
     await act(async () => {});
-    expect(screen.getByRole('note')).not.toHaveTextContent('Hosted copy');
-    expect(screen.getByRole('note')).toHaveTextContent(BANNER);
+    expect(modal).toHaveAttribute('data-mode', 'mock');
+    expect(modal).toHaveTextContent('PingFederate parts use real PingFederate');
+    expect(modal).toHaveTextContent("the lab's own server is a teaching server, not a product");
+    expect(modal).toHaveTextContent('UNVERIFIED on our tenant');
+    expect(modal).toHaveTextContent('Tests with canned PingFederate replies prove nothing about PingFederate');
+    expect(modal).not.toHaveTextContent('Hosted copy');
+  });
+
+  it('hosted copy: the modal says state is per visitor and lost on restart, direction 1 is real PingFederate, the H2 claim is UNVERIFIED', async () => {
+    configAs('hosted');
+    render(<App />);
+    const modal = await screen.findByTestId('mode-modal');
+    await waitFor(() => expect(screen.getByTestId('mode-modal')).toHaveTextContent(/^MOCKHosted copy: direction 2 is simulated/));
+    expect(modal).toHaveAttribute('data-mode', 'mock');
+    expect(MODE_LINES.hosted).toContain('direction 1 uses real PingFederate');
+    expect(MODE_LINES.hosted).toMatch(/per visitor/);
+    expect(MODE_LINES.hosted).not.toMatch(/shared by every visitor/);
+    expect(MODE_LINES.hosted).toMatch(/UNVERIFIED on our tenant/);
+    expect(modal).toHaveTextContent('lost on restart');
+  });
+
+  it('Real: opens on REAL and says what Real adds and what stays simulated', async () => {
+    configAs('local', { source: 'real', mode: 'real', realAvailable: true });
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('mode-modal')).toHaveAttribute('data-mode', 'real'));
+    const modal = screen.getByTestId('mode-modal');
+    expect(modal).toHaveTextContent('REAL');
+    expect(modal).toHaveTextContent('Real adds a PingFederate sign-in (pi.flow)');
+    expect(modal).toHaveTextContent('still a teaching server');
+    expect(modal).toHaveTextContent('UNVERIFIED on our tenant');
+  });
+
+  it('Real-on-load race: MOCK shows first, is dismissed, and REAL still appears once /api/info answers', async () => {
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url === '/api/config') return json({ mode: 'local', pfBase: 'https://pf.example:9031' });
+      if (url === '/api/info') { await gate; return json({ source: 'real', mode: 'real', realAvailable: true }); }
+      return json({ ok: true });
+    }));
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByTestId('mode-modal')).toHaveAttribute('data-mode', 'mock');
+    await user.click(screen.getByTestId('mode-modal-ok'));
+    expect(screen.queryByTestId('mode-modal')).toBeNull();
+    release();
+    await waitFor(() => expect(screen.getByTestId('mode-modal')).toHaveAttribute('data-mode', 'real'));
+  });
+
+  it('Got it closes it, and a remount in the same session does not bring it back', async () => {
+    configAs('local');
+    const user = userEvent.setup();
+    const first = render(<App />);
+    await user.click(await screen.findByTestId('mode-modal-ok'));
+    expect(screen.queryByTestId('mode-modal')).toBeNull();
+    first.unmount();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'What CIMD is' });
+    expect(screen.queryByTestId('mode-modal')).toBeNull();
+  });
+
+  it('Story on at load (remembered in localStorage): the modal is suppressed', async () => {
+    configAs('local');
+    localStorage.setItem('cimd.story.view', 'story');
+    try {
+      render(<App />);
+      await screen.findByTestId('story-toggle');
+      await act(async () => {});
+      expect(screen.queryByTestId('mode-modal')).toBeNull();
+      expect(document.querySelector('.banner')).toBeNull();
+    } finally { localStorage.removeItem('cimd.story.view'); }
+  });
+
+  it('no banner paragraph remains anywhere on the page', async () => {
+    configAs('local');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'What CIMD is' });
+    expect(document.querySelector('.banner')).toBeNull();
+    expect(screen.queryByText(/PingFederate parts use real PingFederate/, { selector: '.banner' })).toBeNull();
   });
 });
 

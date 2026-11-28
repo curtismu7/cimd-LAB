@@ -34,7 +34,7 @@ const primaries = () => screen.queryAllByRole('button').filter((b) => b.classLis
 const open = async (user, name) => { await user.click(screen.getByRole('tab', { name })); };
 
 describe('app shell', () => {
-  it('one shell bar holds the app name (h1), the tablist and the controls; the banner is the first thing in the page below it', async () => {
+  it('one shell bar holds the app name (h1), the tablist and the controls; the page below it starts with the main panel (no banner)', async () => {
     const { container } = render(<App />);
     await screen.findByRole('heading', { name: 'What CIMD is' });
     const bar = container.querySelector('header.shell-bar');
@@ -45,7 +45,8 @@ describe('app shell', () => {
     expect(bar.querySelector('.shell-right')).toContainElement(screen.getByRole('button', { name: 'Presenter mode' }));
     expect(bar.querySelector('.shell-right')).toContainElement(screen.getByTestId('theme-select'));
     const page = container.querySelector('.page');
-    expect(page.firstElementChild).toHaveClass('banner');
+    expect(page.querySelector('.banner')).toBeNull();
+    expect(page.firstElementChild).toHaveAttribute('data-testid', 'mode');
     expect(page.querySelector('main')).not.toBeNull();
   });
 
