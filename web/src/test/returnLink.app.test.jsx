@@ -30,13 +30,14 @@ describe("return link", () => {
     for (const [h, f] of pins) expect(createHash("sha256").update(fs.readFileSync(path.join(dir, f))).digest("hex"), f).toBe(h);
   });
 
-  it("?from=customer-agent: banner first, strip right below, header Back in the tools", async () => {
+  it("?from=customer-agent: the strip is the first thing in the page (no banner), header Back in the tools", async () => {
     window.history.replaceState(null, "", "/?from=customer-agent&uc=UC43&vertical=banking");
     render(<App />);
     const note = await screen.findByRole("note", NOTE);
     await screen.findByRole("heading", { name: "What CIMD is" });
     expect(note.textContent).toContain("UC43");
-    expect(document.querySelector(".banner").nextElementSibling).toBe(note);
+    expect(document.querySelector(".page").firstElementChild).toBe(note);
+    expect(document.querySelector(".banner")).toBeNull();
     expect(document.querySelector(".shell-bar .shell-right button.return-link--header")).not.toBeNull();
     expect(screen.getAllByRole("button", { name: /Back to Customer Agent LAB/ })).toHaveLength(2);
   });

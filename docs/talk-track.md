@@ -2,7 +2,7 @@
 
 Ten short beats. Each is also a presenter note. Use the arrow keys in presenter mode to step the diagram on screen. The story under each beat is told about Meridian Journeys and its assistant, Wanderly; pick another vertical on the Stories tab to retell it.
 
-On the hosted copy (the banner says so), say it plainly: direction 2 is simulated by the lab's teaching server, direction 1 uses real PingFederate, and state is ephemeral, lost on restart, and kept per visitor, so Reset clears only your own workspace.
+On the hosted copy (the MOCK modal says so), say it plainly: direction 2 is simulated by the lab's teaching server, direction 1 uses real PingFederate, and state is ephemeral, lost on restart, and kept per visitor, so Reset clears only your own workspace.
 
 ## 1. The registration problem
 - A client that wants to use an authorization server has to register with it first.

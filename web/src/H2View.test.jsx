@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App, { RELEASE_BANNER, TABS, MODE_H2, MODE_PF } from './App.jsx';
+import App, { MODE_LINES, TABS, MODE_H2, MODE_PF } from './App.jsx';
 import H2View, { MODE_TEXT } from './views/H2View.jsx';
 import { setJsonView } from './components/JsonPane.jsx';
 import { MOCK_TABLE } from '../../server/src/gateway-sim-table.js';
@@ -334,15 +334,17 @@ describe('H2 2026 tab: Live', () => {
 });
 
 describe('H2 2026 tab inside the app', () => {
-  it('is a tab; the release banner is on every tab and in presenter mode; Reset returns the tab to Mock', async () => {
+  it('is a tab; the release claim is UNVERIFIED in the modal line and in the H2 tab own banner, also in presenter mode; Reset returns the tab to Mock', async () => {
     const user = userEvent.setup();
     render(<App />);
     expect(TABS.map((t) => t.id)).toEqual(['learn', 'pf', 'lab', 'h2', 'stories', 'talk']);
     for (const tab of TABS) {
       await user.click(screen.getByRole('tab', { name: tab.label }));
-      expect(screen.getAllByRole('note')[0]).toHaveTextContent('Ping release claim, UNVERIFIED on our tenant');
+      expect(document.querySelector('.page > .banner')).toBeNull(); // the page-wide banner is gone on every tab
     }
-    expect(RELEASE_BANNER).toMatch(/^Ping release claim, UNVERIFIED on our tenant/);
+    expect(MODE_LINES.mock).toMatch(/UNVERIFIED on our tenant/);
+    expect(MODE_LINES.real).toMatch(/UNVERIFIED on our tenant/);
+    expect(MODE_LINES.hosted).toMatch(/UNVERIFIED on our tenant/);
     expect(screen.getByTestId('mode')).toHaveTextContent(MODE_PF);
     await user.click(screen.getByRole('tab', { name: 'H2 2026: gateway and CIMD' }));
     expect(screen.getByTestId('mode')).toHaveTextContent(MODE_H2);
@@ -354,9 +356,8 @@ describe('H2 2026 tab inside the app', () => {
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     await screen.findByTestId('mock-table');
     expect(screen.getByRole('button', { name: 'Mock' })).toHaveAttribute('aria-pressed', 'true');
-    // presenter mode keeps the banner and the tab
+    // presenter mode keeps the H2 tab's own banner and the tab
     await user.click(screen.getByRole('button', { name: 'Presenter mode' }));
-    expect(screen.getAllByRole('note')[0]).toHaveTextContent('Ping release claim, UNVERIFIED on our tenant');
     expect(screen.getByTestId('h2-banner')).toHaveTextContent('Ping release claim, UNVERIFIED on our tenant');
     expect(screen.getByTestId('mode-banner')).toBeInTheDocument();
   });

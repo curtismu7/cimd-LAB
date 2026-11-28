@@ -6,7 +6,7 @@
 #
 # NAMESPACE, IMAGE, SE_HOST and PF_BASE_URL have no defaults. DRY_RUN=1 prints every rendered manifest, applies nothing, needs no cluster.
 # Renders everything to a temp dir first and fails (before any apply) if any __TOKEN__ is left in any file. After a real deploy (not done here): verify by CONTENT (/api/health is demo-health/1 and the
-# page carries the hosted banner), check the registry manifest and the pod imageID, then hand over the https:// URL.
+# page carries the hosted modal line), check the registry manifest and the pod imageID, then hand over the https:// URL.
 # Roll back: kubectl -n "$NAMESPACE" delete -f <rendered files> (or delete the deployment, service, ingress, certificate and configmap named cimd-lab).
 set -euo pipefail
 cd "$(dirname "$0")/../k8s"

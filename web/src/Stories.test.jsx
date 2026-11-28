@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App, { HOSTED_BANNER } from './App.jsx';
+import App, { MODE_LINES } from './App.jsx';
 
 const json = (data, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => data });
 const story = (vertical, label) => ({
@@ -50,12 +50,12 @@ describe('customer branding', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'CIMD Lab' })).toBeInTheDocument();
   });
 
-  it('the hosted banner says state is per visitor', async () => {
+  it('the hosted modal line says state is per visitor', async () => {
     mode = 'hosted';
     render(<App />);
-    expect(await screen.findByRole('note')).toHaveTextContent(HOSTED_BANNER);
-    expect(HOSTED_BANNER).toMatch(/per visitor/);
-    expect(HOSTED_BANNER).not.toMatch(/shared by every visitor/);
+    await waitFor(() => expect(screen.getByTestId('mode-modal')).toHaveTextContent(MODE_LINES.hosted));
+    expect(MODE_LINES.hosted).toMatch(/per visitor/);
+    expect(MODE_LINES.hosted).not.toMatch(/shared by every visitor/);
   });
 });
 

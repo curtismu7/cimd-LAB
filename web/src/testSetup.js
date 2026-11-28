@@ -2,7 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
-afterEach(cleanup);
+// Once a test dismisses the Real-or-mock modal its seen flag lives in sessionStorage: clear it so the next test starts with the modal open.
+afterEach(() => { cleanup(); try { sessionStorage.clear(); } catch { /* no storage */ } });
 
 class RO { observe() {} unobserve() {} disconnect() {} }
 globalThis.ResizeObserver ??= RO;
